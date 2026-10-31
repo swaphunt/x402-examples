@@ -8,9 +8,17 @@ Pays for four SwapHunt endpoints with x402, has an LLM write a short market brie
 | `/v1/regime/current` | $0.002 | BTC regime: bullish, bearish or neutral |
 | `/v1/market/global` | $0.002 | Total market cap, volume, BTC dominance |
 | `/v1/events/macro?days=7&high_impact_only=true` | $0.003 | High-impact macro events this week |
-| **Total per run** | **$0.008** | about $0.24 a month at one run per day |
+| **Total per run** | **$0.008** | |
 
-The LLM is extra: about $0.013 per run with Claude Opus 5.5 (measured: 755 input + 505 output tokens; the script prints the token counts every run), or free with a local model through Ollama.
+The LLM writing the brief is extra. Measured on 31 October 2026; the script prints the token counts on every run:
+
+| LLM | Tokens per run | LLM cost per run | Total per run | Total per month (1 run/day) |
+|---|---|---|---|---|
+| Claude Haiku 5.5 (default) | 765 in + 270 out | about $0.0002 | about $0.008 | about $0.25 |
+| Claude Opus 5.5 (`LLM_MODEL=claude-opus-5-5`) | 755 in + 505 out | about $0.013 | about $0.021 | about $0.63 |
+| Local model via Ollama (`LLM_PROVIDER=ollama`) | 714 in + 194 out | free | $0.008 | $0.24 |
+
+Haiku is plenty for a fact summary like this. Opus writes a somewhat richer brief if you want it.
 
 ## Setup
 
@@ -38,7 +46,7 @@ Before paying, the script checks that the run total stays under `MAX_SPEND_USD` 
 | Variable | Default | Values |
 |---|---|---|
 | `LLM_PROVIDER` | `anthropic` | `anthropic` (needs `ANTHROPIC_API_KEY`), `ollama` (local, needs [Ollama](https://ollama.com) running), `none` (delivers the raw JSON) |
-| `LLM_MODEL` | per provider | `claude-opus-5-5` for anthropic, `qwen3.5:9b` for ollama |
+| `LLM_MODEL` | per provider | `claude-haiku-5-5` for anthropic (or e.g. `claude-opus-5-5`), `qwen3.5:9b` for ollama |
 | `OLLAMA_URL` | `http://localhost:11434` | |
 | `DELIVERY` | `stdout` | `stdout`, `telegram`, `discord`, `email` |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | | for `telegram` |
@@ -72,21 +80,19 @@ Prices (from the 402 responses):
 
 Crypto brief 2026-10-31
 -----------------------
-Crypto sentiment is cautious this Saturday, with the Fear & Greed Index at 30, in "Fear"
-territory. Bitcoin's trend regime is bearish on the 12-hour chart: BTC trades around $77,427,
-about 2.9% below its 20-period EMA of roughly $79,867, and that average is itself sloping down
-by about 1.6%. [...] The total crypto market is worth about $2.60 trillion, with roughly
-$61.2 billion traded over the past 24 hours. Bitcoin dominance stands near 59.8% and Ethereum's
-share is about 10.6%, so capital remains heavily concentrated in BTC. The main scheduled macro
-event in the coming week is the high-impact US Nonfarm Payrolls report on Friday, 6 November,
-at 13:30 UTC. Jobs data of this kind often brings added volatility to risk assets around its release.
+Crypto sentiment is in the Fear zone today, with the Fear & Greed Index at 30 as of the latest
+reading from Alternative.me. The BTC regime is classified as BEARISH on the 12-hour timeframe,
+with price at about $77,460, roughly 2.9% below its 20-period EMA of about $79,867, and the EMA
+sloping downward at about -1.6%. The total crypto market capitalization stands near $2.60
+trillion, with 24-hour trading volume of about $61.2 billion. Bitcoin's dominance is about 59.8%
+and Ethereum's is about 10.6%. The next high-impact macro event in the data is the US Nonfarm
+Payrolls release on Friday, 6 November 2026, at 13:30 UTC, and it is the only high-impact event
+listed for the coming week.
 
-Data provided by Alternative.me Crypto Fear & Greed Index.
-
-This run cost $0.008 in x402 payments. LLM: claude-opus-5-5, 755 input + 505 output tokens
+This run cost $0.008 in x402 payments. LLM: claude-haiku-5-5, 765 input + 270 output tokens
 ```
 
-With `LLM_PROVIDER=ollama` and `qwen3.5:9b` the brief is similar, takes about 20 seconds on a desktop GPU, and the last line reads `LLM: qwen3.5:9b (local), 714 input + 194 output tokens`.
+With `LLM_MODEL=claude-opus-5-5` the brief is a little richer and the last line reads `LLM: claude-opus-5-5, 755 input + 505 output tokens`. With `LLM_PROVIDER=ollama` and `qwen3.5:9b` it takes about 20 seconds on a desktop GPU and reads `LLM: qwen3.5:9b (local), 714 input + 194 output tokens`.
 
 ## Run it daily with cron
 
