@@ -1,6 +1,6 @@
 # SwapHunt MCP server
 
-An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 20 SwapHunt tools: prices, market regime, volatility, sentiment, derivatives, macro events and anti-FOMO sanity checks. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
+An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 17 SwapHunt tools: prices, market regime, volatility, sentiment, derivatives, macro events and anti-FOMO sanity checks. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
 
 Every tool description states its price, so the agent can see what a call costs before making it.
 
@@ -8,17 +8,15 @@ Every tool description states its price, so the agent can see what a call costs 
 
 | Tool | Price | Tool | Price |
 |---|---|---|---|
-| `get_spending` | free | `get_market_regime` | $0.002 |
-| `get_price` | $0.001 | `get_chop_detection` | $0.003 |
-| `get_prices` | $0.003 | `get_volatility` | $0.002 |
-| `get_fear_greed` | $0.001 | `get_trading_session` | $0.001 |
-| `get_market_overview` | $0.002 | `get_macro_events` | $0.003 |
-| `get_alt_season` | $0.003 | `get_funding_rates` | $0.003 |
-| `get_momentum_rank` | $0.003 | `get_liquidations` | $0.003 |
-| `get_crypto_news` | $0.005 | `is_this_a_dip` | $0.003 |
+| `get_spending` | free | `get_trading_session` | $0.001 |
+| `get_price` | $0.001 | `get_macro_events` | $0.003 |
+| `get_prices` | $0.003 | `get_funding_rates` | $0.003 |
+| `get_fear_greed` | $0.001 | `get_liquidations` | $0.003 |
+| `get_market_overview` | $0.002 | `is_this_a_dip` | $0.003 |
 | `get_sentiment_summary` | $0.003 | `is_this_a_breakout` | $0.003 |
-| `how_late_am_i` | $0.003 | `is_this_oversold` | $0.003 |
-| `is_price_extended` | $0.003 | | |
+| `get_market_regime` | $0.002 | `is_this_oversold` | $0.003 |
+| `get_chop_detection` | $0.003 | `how_late_am_i` | $0.003 |
+| `get_volatility` | $0.002 | `is_price_extended` | $0.003 |
 
 `get_spending` is free and shows what the session has spent and how much budget is left.
 
@@ -45,7 +43,9 @@ nano ~/.swaphunt-wallet.key        # paste the private key, save
 | `PRIVATE_KEY` | | The key itself, if you prefer an environment variable. |
 | `MAX_SPEND_USD` | `0.10` | Spending cap for the session (one server process). Calls beyond it are refused, not paid. |
 
-Each payment is also locked to the price, network and `payTo` address the API quoted for that call, and a tool refuses to pay more than the price in its description.
+Each payment is also locked to the price, asset (USDC), network (Base) and `payTo` address the API quoted for that call, and a tool refuses to pay more than the price in its description. If a call fails after the payment was sent, it still counts against the cap and is reported as "possibly paid".
+
+Tool results include third-party text (news headlines). The spending cap and price checks still apply whatever the agent is told.
 
 ## Claude Code
 

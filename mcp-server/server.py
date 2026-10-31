@@ -166,22 +166,9 @@ async def get_market_overview() -> dict:
     return await call("/v1/market/global", 0.002)
 
 
-@paid(0.003, "Alt-season read: Altcoin Season Index plus how many top alts beat BTC over `days` (1-30).")
-async def get_alt_season(days: int = 7) -> dict:
-    return await call("/v1/market/alt-season", 0.003, days=days)
-
-
-@paid(0.003, "Top and bottom coins by return over `period` (24h, 7d, 30d); `limit` 1-20.")
-async def get_momentum_rank(period: str = "24h", limit: int = 10) -> dict:
-    return await call("/v1/market/momentum-rank", 0.003, period=period, limit=limit)
-
-
 # --- Sentiment --------------------------------------------------------------
-
-@paid(0.005, "Recent crypto headlines, each scored 1-10 for trading impact with a bullish/bearish tag.")
-async def get_crypto_news(hours: int = 24, min_score: int | None = None, limit: int = 10) -> dict:
-    return await call("/v1/sentiment/news", 0.005, hours=hours, min_score=min_score, limit=limit)
-
+# get_alt_season, get_momentum_rank and get_crypto_news are left out until their endpoints
+# stop returning 502 (their 402 response is too large for the API's proxy).
 
 @paid(0.003, "Aggregated news sentiment (strong_bearish to strong_bullish) over the last `hours`.")
 async def get_sentiment_summary(hours: int = 24) -> dict:
