@@ -2,7 +2,16 @@
 
 Base URL: `https://x402.swaphunt.dev`. All paid routes are `GET`, return JSON, and answer `402 Payment Required` (x402 v2) until paid. No API key needed.
 
-Payment: USDC, scheme `exact`, network **Base mainnet** (`eip155:8453`, USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`). Free routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.
+Payment: USDC, scheme `exact`, on any of these networks (same price on each; clients take the first one they support):
+
+| Network | CAIP-2 id | USDC contract |
+|---|---|---|
+| Base | `eip155:8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Polygon | `eip155:137` | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
+| Arbitrum One | `eip155:42161` | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
+| Solana | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+
+Free routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.
 
 Generated from SwapHunt's pricing config, with real responses captured 2026-10-29. Long responses are trimmed (`…`).
 

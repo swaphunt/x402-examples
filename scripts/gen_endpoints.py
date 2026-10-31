@@ -68,9 +68,30 @@ L = []
 L.append("# SwapHunt x402 endpoints\n")
 L.append("Base URL: `https://x402.swaphunt.dev`. All paid routes are `GET`, return JSON, "
          "and answer `402 Payment Required` (x402 v2) until paid. No API key needed.\n")
-L.append("Payment: USDC, scheme `exact`, network **Base mainnet** (`eip155:8453`, "
-         "USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`). "
-         "Free routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.\n")
+
+# Networks are server config, not in pricing.py: read them from a live 402 so this never goes stale.
+import base64
+import urllib.error
+import urllib.request
+
+NETWORK_NAMES = {"eip155:8453": "Base", "eip155:137": "Polygon", "eip155:42161": "Arbitrum One",
+                 "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "Solana"}
+probe = urllib.request.Request("https://x402.swaphunt.dev/v1/market/fear-greed",
+                               headers={"User-Agent": "swaphunt-x402-examples/gen_endpoints"})
+try:
+    urllib.request.urlopen(probe, timeout=15)
+    sys.exit("expected a 402 from the live API")
+except urllib.error.HTTPError as e:
+    if e.code != 402 or not e.headers.get("PAYMENT-REQUIRED"):
+        sys.exit(f"expected a 402 with a PAYMENT-REQUIRED header, got HTTP {e.code}")
+    accepts = json.loads(base64.b64decode(e.headers["PAYMENT-REQUIRED"]))["accepts"]
+L.append("Payment: USDC, scheme `exact`, on any of these networks (same price on each; "
+         "clients take the first one they support):\n")
+L.append("| Network | CAIP-2 id | USDC contract |")
+L.append("|---|---|---|")
+for a in accepts:
+    L.append(f"| {NETWORK_NAMES.get(a['network'], a['network'])} | `{a['network']}` | `{a['asset']}` |")
+L.append("\nFree routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.\n")
 L.append(f"Generated from SwapHunt's pricing config, with real responses captured "
          f"{cap_at[:10]}. Long responses are trimmed (`…`).\n")
 L.append("## Overview\n")

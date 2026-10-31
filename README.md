@@ -1,6 +1,8 @@
 # SwapHunt x402 examples
 
-[SwapHunt](https://swaphunt.dev)'s x402 API sells crypto market context per call (prices, regime, volatility, sentiment, funding, macro events, anti-FOMO checks), paid in USDC on Base with the [x402 protocol](https://x402.org). No account, no API key: the payment is the credential.
+[SwapHunt](https://swaphunt.dev)'s x402 API sells crypto market context per call (prices, regime, volatility, sentiment, funding, macro events, anti-FOMO checks), paid in USDC on Base, Polygon, Arbitrum or Solana with the [x402 protocol](https://x402.org). No account, no API key: the payment is the credential.
+
+The examples pay on Base. Every endpoint has the same price on all four networks; see [docs/endpoints.md](docs/endpoints.md) for the network list.
 
 These examples get you from zero to a paid call in a few minutes, and show how to build on it.
 
