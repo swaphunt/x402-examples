@@ -125,7 +125,7 @@ def summarize(data: dict) -> tuple[str, str]:
 
     request = dict(
         model=LLM_MODEL,
-        max_tokens=16000,
+        max_tokens=2000,
         output_config={"effort": "low"},  # a short summary needs little reasoning
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
@@ -139,6 +139,8 @@ def summarize(data: dict) -> tuple[str, str]:
     if resp.stop_reason == "refusal":
         stop("The model declined to write the brief.")
     text = "".join(b.text for b in resp.content if b.type == "text").strip()
+    if resp.stop_reason == "max_tokens":
+        text += "\n[brief cut off at max_tokens]"
     usage = f"LLM: {resp.model}, {resp.usage.input_tokens} input + {resp.usage.output_tokens} output tokens"
     return text, usage
 

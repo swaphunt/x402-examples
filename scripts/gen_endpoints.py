@@ -71,8 +71,8 @@ L.append("Base URL: `https://x402.swaphunt.dev`. All paid routes are `GET`, retu
 L.append("Payment: USDC, scheme `exact`, network **Base mainnet** (`eip155:8453`, "
          "USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`). "
          "Free routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.\n")
-L.append(f"Source: `src/api/x402/pricing.py` (prices, params) and `examples.json` "
-         f"(real responses captured {cap_at[:10]}). Long responses are trimmed (`…`).\n")
+L.append(f"Generated from SwapHunt's pricing config, with real responses captured "
+         f"{cap_at[:10]}. Long responses are trimmed (`…`).\n")
 L.append("## Overview\n")
 L.append("| Category | Endpoint | Price (USDC) | Params |")
 L.append("|---|---|---|---|")

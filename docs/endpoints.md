@@ -4,7 +4,7 @@ Base URL: `https://x402.swaphunt.dev`. All paid routes are `GET`, return JSON, a
 
 Payment: USDC, scheme `exact`, network **Base mainnet** (`eip155:8453`, USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`). Free routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.
 
-Source: `src/api/x402/pricing.py` (prices, params) and `examples.json` (real responses captured 2026-10-29). Long responses are trimmed (`…`).
+Generated from SwapHunt's pricing config, with real responses captured 2026-10-29. Long responses are trimmed (`…`).
 
 ## Overview
 

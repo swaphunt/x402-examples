@@ -12,11 +12,13 @@ Pays for four SwapHunt endpoints with x402, has an LLM write a short market brie
 
 The LLM writing the brief is extra. Measured on 31 October 2026; the script prints the token counts on every run:
 
-| LLM | Tokens per run | LLM cost per run | Total per run | Total per month (1 run/day) |
-|---|---|---|---|---|
-| Claude Haiku 5.5 (default) | 765 in + 270 out | about $0.0002 | about $0.008 | about $0.25 |
-| Claude Opus 5.5 (`LLM_MODEL=claude-opus-5-5`) | 755 in + 505 out | about $0.013 | about $0.021 | about $0.63 |
-| Local model via Ollama (`LLM_PROVIDER=ollama`) | 714 in + 194 out | free | $0.008 | $0.24 |
+| LLM | Price per MTok (in / out) | Tokens per run | LLM per run | Total per run | Total per month (30 runs) |
+|---|---|---|---|---|---|
+| Claude Haiku 5.5 (default) | $0.10 / $0.50 | 765 in + 270 out | $0.0002 | $0.0082 | $0.25 |
+| Claude Opus 5.5 (`LLM_MODEL=claude-opus-5-5`) | $4 / $20 | 755 in + 505 out | $0.0131 | $0.0211 | $0.63 |
+| Local model via Ollama (`LLM_PROVIDER=ollama`) | free | 714 in + 194 out | $0 | $0.0080 | $0.24 |
+
+Claude prices from [Anthropic's pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (Haiku 5.5 rate for prompts up to 100k tokens).
 
 Haiku is plenty for a fact summary like this. Opus writes a somewhat richer brief if you want it.
 
