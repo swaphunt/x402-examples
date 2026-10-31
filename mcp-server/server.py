@@ -19,6 +19,7 @@ from x402.http import decode_payment_required_header, decode_payment_response_he
 from x402.http.clients import x402HttpxClient
 from x402.mechanisms.evm import EthAccountSigner
 from x402.mechanisms.evm.exact.register import register_exact_evm_client
+from x402.schemas.errors import NoMatchingRequirementsError
 
 BASE = "https://x402.swaphunt.dev"
 MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
@@ -45,25 +46,41 @@ _calls = 0
 _lock = asyncio.Lock()  # tools may run concurrently; budget checks must not race
 
 
+BASE_MAINNET = "eip155:8453"
+USDC_ON_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # canonical USDC, 6 decimals
+
+
 def _usd(req) -> float:
-    return int(req.amount) / 1e6  # USDC has 6 decimals
+    return int(req.amount) / 1e6  # only valid for USDC, which _quote enforces
 
 
 async def _quote(path: str, params: dict) -> Any:
-    """Unpaid request -> 402 with the payment requirements (Base is offered first)."""
+    """Unpaid request -> 402. Returns the USDC-on-Base option; any other asset or network is refused."""
     async with httpx.AsyncClient(timeout=30) as http:
         r = await http.get(BASE + path, params=params)
     if r.status_code != 402:
         raise RuntimeError(f"expected 402 from {path}, got {r.status_code}: {r.text[:200]}")
-    return decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts[0]
+    for req in decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts:
+        if req.network == BASE_MAINNET and req.asset.lower() == USDC_ON_BASE:
+            return req
+    raise RuntimeError(f"{path} offers no USDC payment on Base")
 
 
 def _locked_to(quote):
-    """Payment policy: pay only exactly what was quoted, on that network, to that address."""
+    """Payment policy: pay only exactly what was quoted, in that asset, on that network, to that address."""
     def policy(version, reqs):
         return [r for r in reqs if r.amount == quote.amount and r.network == quote.network
-                and r.pay_to.lower() == quote.pay_to.lower()]
+                and r.asset.lower() == quote.asset.lower() and r.pay_to.lower() == quote.pay_to.lower()]
     return policy
+
+
+def _refused_before_signing(e: BaseException) -> bool:
+    """True only if the client rejected the payment terms, which happens before anything is signed."""
+    while e is not None:
+        if isinstance(e, NoMatchingRequirementsError):
+            return True
+        e = e.__cause__ or e.__context__
+    return False
 
 
 async def call(path: str, advertised: float, **params: Any) -> dict:
@@ -82,22 +99,35 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
             return {"error": f"Session spending cap reached: ${_spent:.3f} spent of MAX_SPEND_USD=${MAX_SPEND:g}; "
                              f"this call costs ${price:.3f}. Restart the server or raise MAX_SPEND_USD."}
         _spent += price  # reserve before paying so parallel calls can't overshoot
+    # The reservation is released only when it is certain nothing was signed. Any failure after
+    # the request starts (timeout, non-200, missing receipt) stays counted as possibly paid.
     try:
         client = x402Client().set_spend_controls({"max_amount_per_payment": f"${price:.6f}"})
         client.register_policy(_locked_to(quote))
         register_exact_evm_client(client, EthAccountSigner(Account.from_key(os.environ["PRIVATE_KEY"])))
-        async with x402HttpxClient(client, timeout=60) as http:
-            r = await http.get(BASE + path, params=params)
-        if r.status_code != 200:
-            raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
     except Exception as e:
         async with _lock:
-            _spent -= price  # not paid: release the reservation
-        return {"error": f"Not paid: {e}"}
-    tx = decode_payment_response_header(r.headers["PAYMENT-RESPONSE"]).transaction
+            _spent -= price
+        return {"error": f"Not paid (wallet setup failed): {type(e).__name__}"}
+    try:
+        async with x402HttpxClient(client, timeout=60) as http:
+            r = await http.get(BASE + path, params=params)
+    except Exception as e:
+        if _refused_before_signing(e):
+            async with _lock:
+                _spent -= price
+            return {"error": f"Not paid: the payment terms changed since the quote ({e})"}
+        return {"error": f"Possibly paid ${price:.3f}, no data: {type(e).__name__}: {str(e)[:150]}. "
+                         "Counted against the session cap; check the wallet on basescan.org."}
+    receipt = r.headers.get("PAYMENT-RESPONSE")
+    tx = decode_payment_response_header(receipt).transaction if receipt else None
+    tx_link = f"https://basescan.org/tx/{tx}" if tx else None
+    if r.status_code != 200:
+        return {"error": f"Possibly paid ${price:.3f}, no data: HTTP {r.status_code}. Counted against the session cap.",
+                "tx": tx_link}
     _calls += 1
     return {"data": r.json(), "cost_usd": price, "session_spent_usd": round(_spent, 6),
-            "session_remaining_usd": round(MAX_SPEND - _spent, 6), "tx": f"https://basescan.org/tx/{tx}"}
+            "session_remaining_usd": round(MAX_SPEND - _spent, 6), "tx": tx_link}
 
 
 def paid(price: float, summary: str):

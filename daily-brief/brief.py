@@ -58,21 +58,28 @@ async def get_quotes() -> list:
             r = await http.get(BASE + path, params=params)
             if r.status_code != 402:
                 stop(f"{path}: expected 402, got {r.status_code}")
-            quotes.append(decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts[0])
-            q = quotes[-1]
+            accepts = decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts
+            q = next((a for a in accepts if a.network == BASE_MAINNET and a.asset.lower() == USDC_ON_BASE), None)
+            if q is None:
+                stop(f"{path}: no USDC payment on Base offered")
+            quotes.append(q)
             print(f"  {path:<24} ${usd(q):.3f}  {q.network}  payTo {q.pay_to}")
     return quotes
 
 
+BASE_MAINNET = "eip155:8453"
+USDC_ON_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # canonical USDC, 6 decimals
+
+
 def usd(req) -> float:
-    return int(req.amount) / 1e6  # USDC has 6 decimals
+    return int(req.amount) / 1e6  # only valid for USDC, which get_quotes enforces
 
 
 def only_as_quoted(quote):
-    """Payment policy: accept only the exact amount, network and payTo shown in the dry run."""
+    """Payment policy: accept only the exact amount, asset, network and payTo shown in the dry run."""
     def policy(version, reqs):
         return [r for r in reqs if r.amount == quote.amount and r.network == quote.network
-                and r.pay_to.lower() == quote.pay_to.lower()]
+                and r.asset.lower() == quote.asset.lower() and r.pay_to.lower() == quote.pay_to.lower()]
     return policy
 
 
