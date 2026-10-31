@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "swaphunt-mcp"
+dynamic = ["version"]
+description = "MCP server with 20 SwapHunt crypto market tools for AI agents, paid per call in USDC via x402"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "SwapHunt", email = "github@swaphunt.dev" }]
+keywords = ["mcp", "x402", "crypto", "usdc", "base", "ai-agents", "market-data"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+# Exact pins: `uvx swaphunt-mcp` runs in its own environment, so pinning costs nothing
+# and means every user gets the versions this release was tested with.
+dependencies = [
+    "mcp==2.3.0",
+    "x402[httpx,evm]==2.25.0",
+]
+
+[project.urls]
+Homepage = "https://x402.swaphunt.dev/docs"
+Source = "https://github.com/swaphunt/x402-examples/tree/main/mcp-server"
+Issues = "https://github.com/swaphunt/x402-examples/issues"
+
+[project.scripts]
+swaphunt-mcp = "swaphunt_mcp.server:main"
+
+[tool.hatch.version]
+path = "src/swaphunt_mcp/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/swaphunt_mcp"]

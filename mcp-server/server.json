@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.swaphunt/swaphunt-mcp",
+  "title": "SwapHunt crypto market context",
+  "description": "20 crypto market tools for AI agents (regime, volatility, sentiment), paid per call in USDC via x402",
+  "version": "0.1.0",
+  "websiteUrl": "https://x402.swaphunt.dev/docs",
+  "repository": {
+    "url": "https://github.com/swaphunt/x402-examples",
+    "source": "github",
+    "subfolder": "mcp-server"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/swaphunt/x402-examples/main/mcp-server/assets/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "swaphunt-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "X402_PAY",
+          "description": "Set to 1 to pay for calls. Without it every tool is a dry run that only reports the price.",
+          "isRequired": false
+        },
+        {
+          "name": "PRIVATE_KEY_FILE",
+          "description": "Path to a file with the private key of a dedicated wallet holding a few dollars of USDC on Base",
+          "isRequired": false
+        },
+        {
+          "name": "PRIVATE_KEY",
+          "description": "Private key of a dedicated wallet (alternative to PRIVATE_KEY_FILE)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "MAX_SPEND_USD",
+          "description": "Spending cap per session in USD",
+          "default": "0.10",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

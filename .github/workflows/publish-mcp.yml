@@ -1,0 +1,34 @@
+# Publishes mcp-server/ to PyPI as swaphunt-mcp when a tag like mcp-v0.1.0 is pushed.
+# Uses PyPI Trusted Publishing (OIDC): no PyPI token is stored anywhere.
+name: Publish swaphunt-mcp
+
+on:
+  push:
+    tags: ["mcp-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi            # must match the trusted publisher configured on PyPI
+    permissions:
+      id-token: write            # lets PyPI verify this workflow; nothing else
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - name: Tag must match package version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/swaphunt_mcp/__init__.py)
+          test "mcp-v${version}" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != mcp-v${version}"; exit 1; }
+          grep -q "\"version\": \"${version}\"" server.json || { echo "server.json version != ${version}"; exit 1; }
+      - run: uv build
+      - name: Smoke test the wheel
+        run: uv tool run --isolated --from dist/swaphunt_mcp-*.whl swaphunt-mcp --version
+      - run: uv publish --trusted-publishing always

@@ -3,8 +3,8 @@
 Dry run by default: tools report what a call would cost and return no data.
 Set X402_PAY=1 and PRIVATE_KEY (or PRIVATE_KEY_FILE) to pay. Spending is capped per session (server process) by MAX_SPEND_USD.
 
-Run:  python server.py          (stdio, for Claude Desktop / Claude Code)
-      python server.py --check  (compare advertised prices with the live API, pays nothing)
+Run:  uvx swaphunt-mcp            (stdio, for Claude Desktop / Claude Code)
+      uvx swaphunt-mcp --check    (compare advertised prices with the live API, pays nothing)
 """
 import asyncio
 import os
@@ -14,7 +14,10 @@ from typing import Any
 import httpx
 from eth_account import Account
 from mcp.server import MCPServer
+from mcp.types import Icon
 from x402 import x402Client
+
+from swaphunt_mcp import __version__
 from x402.http import decode_payment_required_header, decode_payment_response_header
 from x402.http.clients import x402HttpxClient
 from x402.mechanisms.evm import EthAccountSigner
@@ -22,7 +25,8 @@ from x402.mechanisms.evm.exact.register import register_exact_evm_client
 from x402.schemas.errors import NoMatchingRequirementsError
 
 BASE = "https://x402.swaphunt.dev"
-MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
+ICON_URL = "https://raw.githubusercontent.com/swaphunt/x402-examples/main/mcp-server/assets/icon-512.png"
+MAX_SPEND = float(os.getenv("MAX_SPEND_USD") or "0.10")  # empty counts as unset
 PAY = os.getenv("X402_PAY") == "1"
 # The key can come from a file, so it never has to sit in an MCP client's config file.
 if not os.getenv("PRIVATE_KEY") and os.getenv("PRIVATE_KEY_FILE"):
@@ -32,7 +36,9 @@ if not os.getenv("PRIVATE_KEY") and os.getenv("PRIVATE_KEY_FILE"):
 mcp = MCPServer(
     "swaphunt",
     title="SwapHunt crypto market context",
+    version=__version__,
     website_url="https://x402.swaphunt.dev/docs",
+    icons=[Icon(src=ICON_URL, mime_type="image/png", sizes=["512x512"])],
     instructions=(
         "Crypto market context for trading decisions: prices, regime, volatility, sentiment, "
         "derivatives, macro events and anti-FOMO sanity checks. Every tool except get_spending "
@@ -279,10 +285,17 @@ async def check_prices() -> None:
     sys.exit(1 if bad else 0)
 
 
-if __name__ == "__main__":
-    if "--check" in sys.argv:
+def main() -> None:
+    """Entry point for `swaphunt-mcp` (and `uvx swaphunt-mcp`)."""
+    if "--version" in sys.argv:
+        print(f"swaphunt-mcp {__version__}")
+    elif "--check" in sys.argv:
         asyncio.run(check_prices())
     else:
         if PAY and not os.getenv("PRIVATE_KEY"):
             sys.exit("X402_PAY=1 needs PRIVATE_KEY or PRIVATE_KEY_FILE (a dedicated wallet with a few dollars of USDC on Base).")
         mcp.run()  # stdio
+
+
+if __name__ == "__main__":
+    main()

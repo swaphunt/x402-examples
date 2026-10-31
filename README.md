@@ -12,7 +12,7 @@ These examples get you from zero to a paid call in a few minutes, and show how t
 |---|---|---|---|
 | [quickstart](quickstart/) | Python, TypeScript | One paid call to `/v1/market/fear-greed` | $0.001 |
 | [daily-brief](daily-brief/) | Python | Four endpoints, summarized by an LLM, delivered to stdout, Telegram, Discord or email | $0.008 + LLM (Haiku 5.5: $0.0002) |
-| [mcp-server](mcp-server/) | Python | 20 SwapHunt tools for Claude and other AI agents, paid per call with a session cap | $0.001-0.005 per tool call |
+| [mcp-server](mcp-server/) | Python (`uvx swaphunt-mcp`) | 20 SwapHunt tools for Claude and other AI agents, paid per call with a session cap | $0.001-0.005 per tool call |
 | [alert-bot](alert-bot/) | Python | Checks one price on an interval and messages you on Telegram when it crosses a threshold | $0.001 per check |
 
 All 42 endpoints with prices, parameters and example responses: [docs/endpoints.md](docs/endpoints.md). Prices range from $0.001 to $0.008 per call.

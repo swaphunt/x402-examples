@@ -1,8 +1,14 @@
 # SwapHunt MCP server
 
+<!-- mcp-name: io.github.swaphunt/swaphunt-mcp -->
+
 An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 20 SwapHunt tools: prices, market regime, volatility, sentiment, derivatives, macro events and anti-FOMO sanity checks. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
 
 Every tool description states its price, so the agent can see what a call costs before making it.
+
+```bash
+uvx swaphunt-mcp            # needs uv: https://docs.astral.sh/uv/
+```
 
 ## Tools
 
@@ -26,15 +32,14 @@ Every tool description states its price, so the agent can see what a call costs 
 
 Use a dedicated wallet with a few dollars of USDC on Base mainnet. Never your main wallet.
 
-```bash
-cd mcp-server
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+Store the wallet key in a file only you can read, so it never sits in a config file:
 
-# Store the wallet key in a file only you can read, so it never sits in a config file:
+```bash
 install -m 600 /dev/null ~/.swaphunt-wallet.key
 nano ~/.swaphunt-wallet.key        # paste the private key, save
 ```
+
+The server runs with [uv](https://docs.astral.sh/uv/)'s `uvx`, which downloads it from PyPI into its own environment. There is nothing to clone or install by hand. Try it without a wallet first: with no settings, every tool is a dry run.
 
 ## Settings
 
@@ -56,7 +61,7 @@ claude mcp add swaphunt \
   --env X402_PAY=1 \
   --env PRIVATE_KEY_FILE=$HOME/.swaphunt-wallet.key \
   --env MAX_SPEND_USD=0.25 \
-  -- /path/to/x402-examples/mcp-server/.venv/bin/python /path/to/x402-examples/mcp-server/server.py
+  -- uvx swaphunt-mcp
 ```
 
 Then ask, for example: *"What's the crypto market mood today, and is BTC trending or chopping on the 4h chart?"*
@@ -69,8 +74,8 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 {
   "mcpServers": {
     "swaphunt": {
-      "command": "/path/to/x402-examples/mcp-server/.venv/bin/python",
-      "args": ["/path/to/x402-examples/mcp-server/server.py"],
+      "command": "uvx",
+      "args": ["swaphunt-mcp"],
       "env": {
         "X402_PAY": "1",
         "PRIVATE_KEY_FILE": "/home/you/.swaphunt-wallet.key",
@@ -81,7 +86,7 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 }
 ```
 
-On Windows, use `.venv\\Scripts\\python.exe` and Windows paths.
+If Claude Desktop can't find `uvx`, use its full path (`which uvx` on macOS/Linux, `where uvx` on Windows).
 
 ## What a tool call returns
 
@@ -110,8 +115,18 @@ When the cap is reached:
 {"error": "Session spending cap reached: $0.002 spent of MAX_SPEND_USD=$0.0025; this call costs $0.001. Restart the server or raise MAX_SPEND_USD."}
 ```
 
+## Run from source
+
+```bash
+git clone https://github.com/swaphunt/x402-examples.git
+cd x402-examples/mcp-server
+uv run swaphunt-mcp            # or: uv run swaphunt-mcp --check
+```
+
 ## For maintainers
 
-`python server.py --check` compares every tool's advertised price with the live API. It pays nothing.
+`uvx swaphunt-mcp --check` compares every tool's advertised price with the live API. It pays nothing.
+
+Source, issues and the other x402 examples (quickstart, daily brief, alert bot): [github.com/swaphunt/x402-examples](https://github.com/swaphunt/x402-examples).
 
 Nothing here is investment advice.
