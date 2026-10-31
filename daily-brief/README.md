@@ -10,7 +10,7 @@ Pays for four SwapHunt endpoints with x402, has an LLM write a short market brie
 | `/v1/events/macro?days=7&high_impact_only=true` | $0.003 | High-impact macro events this week |
 | **Total per run** | **$0.008** | about $0.24 a month at one run per day |
 
-The LLM is extra: about $0.01-0.02 per run with Claude Opus 5.5 (estimate; the script prints the actual token counts), or free with a local model through Ollama.
+The LLM is extra: about $0.013 per run with Claude Opus 5.5 (measured: 755 input + 505 output tokens; the script prints the token counts every run), or free with a local model through Ollama.
 
 ## Setup
 
@@ -59,7 +59,7 @@ Prices (from the 402 responses):
 Dry run: nothing paid, no LLM call. Re-run with --pay to pay.
 ```
 
-Paid run (`LLM_PROVIDER=ollama`, 31 October 2026):
+Paid run with the default `LLM_PROVIDER=anthropic` (31 October 2026):
 
 ```
 Prices (from the 402 responses):
@@ -72,15 +72,21 @@ Prices (from the 402 responses):
 
 Crypto brief 2026-10-31
 -----------------------
-The crypto market sentiment sits firmly in Fear territory with a score of 30, reflecting a
-cautious outlook as Bitcoin tests lower levels. The BTC regime is currently bearish, trading at
-$77,426 against an exponential moving average that sits significantly higher at $79,867. Total
-market capitalization stands near $2.6 trillion, while Bitcoin dominance remains strong at nearly
-60% despite the broader downturn. Investors should keep an eye on the economic calendar over the
-next seven days, specifically for U.S. Nonfarm Payrolls data scheduled for November 6th. [...]
+Crypto sentiment is cautious this Saturday, with the Fear & Greed Index at 30, in "Fear"
+territory. Bitcoin's trend regime is bearish on the 12-hour chart: BTC trades around $77,427,
+about 2.9% below its 20-period EMA of roughly $79,867, and that average is itself sloping down
+by about 1.6%. [...] The total crypto market is worth about $2.60 trillion, with roughly
+$61.2 billion traded over the past 24 hours. Bitcoin dominance stands near 59.8% and Ethereum's
+share is about 10.6%, so capital remains heavily concentrated in BTC. The main scheduled macro
+event in the coming week is the high-impact US Nonfarm Payrolls report on Friday, 6 November,
+at 13:30 UTC. Jobs data of this kind often brings added volatility to risk assets around its release.
 
-This run cost $0.008 in x402 payments. LLM: qwen3.5:9b (local), 714 input + 194 output tokens
+Data provided by Alternative.me Crypto Fear & Greed Index.
+
+This run cost $0.008 in x402 payments. LLM: claude-opus-5-5, 755 input + 505 output tokens
 ```
+
+With `LLM_PROVIDER=ollama` and `qwen3.5:9b` the brief is similar, takes about 20 seconds on a desktop GPU, and the last line reads `LLM: qwen3.5:9b (local), 714 input + 194 output tokens`.
 
 ## Run it daily with cron
 
