@@ -11,7 +11,7 @@ Checks one price at a fixed interval, paying $0.001 per check with x402, and sen
 
 It alerts once when the price crosses the threshold, and again only after the price has gone back and crossed again. The last state is kept in a small file (`.alert-state.json` next to the script, or `ALERT_STATE_FILE`), so this also works when cron starts a new process for every check. Changing the asset or threshold starts fresh. If Telegram delivery fails, the next check tries again.
 
-**Telegram delivery is not tested yet.** The paid price checks, the threshold logic and the state file are tested on Base mainnet. Sending to Telegram was only tested with a mocked send and with an invalid token (the error is reported without the token).
+Tested end to end on 31 October 2026: paid checks on Base mainnet, a real Telegram message on the first crossing, and no message on the next `--once` run.
 
 ## Setup
 
