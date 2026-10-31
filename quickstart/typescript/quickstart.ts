@@ -21,7 +21,8 @@ const stop = (msg: string) => { console.error(msg); process.exit(1); };
 if (price > MAX_SPEND) stop(`Price $${price.toFixed(3)} exceeds MAX_SPEND_USD=${MAX_SPEND}. Not paying.`);
 if (!process.env.PRIVATE_KEY) stop("Set PRIVATE_KEY (a dedicated wallet with a few dollars of USDC on Base).");
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const key = process.env.PRIVATE_KEY!.replace(/^(0x)?/, "0x") as `0x${string}`; // accept keys with or without 0x
+const account = privateKeyToAccount(key);
 const client = x402Client.fromConfig({
   schemes: [{ network: "eip155:8453", client: new ExactEvmScheme(account) }],
   spendControls: { maxAmountPerPayment: `$${MAX_SPEND}` },
