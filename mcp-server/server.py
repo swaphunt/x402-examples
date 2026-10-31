@@ -75,12 +75,11 @@ def _locked_to(quote):
 
 
 def _refused_before_signing(e: BaseException) -> bool:
-    """True only if the client rejected the payment terms, which happens before anything is signed."""
-    while e is not None:
-        if isinstance(e, NoMatchingRequirementsError):
-            return True
-        e = e.__cause__ or e.__context__
-    return False
+    """True only if the client rejected the payment terms, which happens before anything is signed.
+
+    Checks the exception and its explicit cause only; anything less certain counts as possibly paid.
+    """
+    return isinstance(e, NoMatchingRequirementsError) or isinstance(e.__cause__, NoMatchingRequirementsError)
 
 
 async def call(path: str, advertised: float, **params: Any) -> dict:
