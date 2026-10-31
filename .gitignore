@@ -21,3 +21,6 @@ dist/
 
 # Local tooling
 .claude/
+
+# alert-bot state
+.alert-state.json

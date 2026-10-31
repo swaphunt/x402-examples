@@ -2,8 +2,11 @@
 
 Dry run by default: shows the price per check and the expected cost per day, then stops.
 Pass --pay (or X402_PAY=1) to start polling. --once does a single check (for cron).
+The last state (past the threshold or not) is kept in a small file, so --once runs from
+cron alert only on a new crossing.
 """
 import asyncio
+import json
 import os
 import sys
 import time
@@ -18,13 +21,14 @@ from x402.mechanisms.evm.exact.register import register_exact_evm_client
 from x402.schemas.errors import NoMatchingRequirementsError
 
 URL = "https://x402.swaphunt.dev/v1/tools/price"
-ASSET = os.getenv("ALERT_ASSET", "BTC")
+ASSET = os.getenv("ALERT_ASSET") or "BTC"
 BELOW = float(os.environ["ALERT_BELOW"]) if os.getenv("ALERT_BELOW") else None
 ABOVE = float(os.environ["ALERT_ABOVE"]) if os.getenv("ALERT_ABOVE") else None
-INTERVAL_MIN = float(os.getenv("ALERT_INTERVAL_MIN", "15"))
+INTERVAL_MIN = float(os.getenv("ALERT_INTERVAL_MIN") or "15")
 MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
 PAY = "--pay" in sys.argv or os.getenv("X402_PAY") == "1"
 ONCE = "--once" in sys.argv
+STATE_FILE = os.path.expanduser(os.getenv("ALERT_STATE_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), ".alert-state.json"))
 BASE_MAINNET = "eip155:8453"
 USDC_ON_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 
@@ -59,15 +63,32 @@ async def pay_and_fetch(q) -> dict:
     return r.json()
 
 
-def telegram(text: str) -> None:
-    """Send the alert. Errors never print the URL, which contains the bot token."""
+def telegram(text: str) -> bool:
+    """Send the alert; True if Telegram accepted it. Errors never print the URL, which contains the bot token."""
     url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage"
     try:
         r = httpx.post(url, json={"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": text}, timeout=30)
         if r.is_error:
             print(f"Telegram failed: HTTP {r.status_code}", file=sys.stderr)
+        return not r.is_error
     except httpx.HTTPError as e:
         print(f"Telegram failed: {type(e).__name__}", file=sys.stderr)
+        return False
+
+
+def load_alerted(rule: str) -> bool:
+    """True if the last check was already past this threshold and the alert went out."""
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+        return state.get("rule") == rule and state.get("alerted") is True
+    except (OSError, ValueError):
+        return False  # no state yet, or unreadable: treat as not alerted
+
+
+def save_alerted(rule: str, alerted: bool) -> None:
+    with open(STATE_FILE, "w") as f:
+        json.dump({"rule": rule, "alerted": alerted, "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
 
 
 def crossed(price: float) -> str | None:
@@ -96,7 +117,8 @@ def main() -> None:
         if not os.getenv(var):
             stop(f"Set {var}.")
 
-    spent, alerted = 0.0, False
+    state_rule = f"{ASSET} {rule}"  # a changed asset or threshold starts fresh
+    spent, alerted = 0.0, load_alerted(state_rule)
     while True:
         q = quote()
         price = int(q.amount) / 1e6
@@ -116,9 +138,12 @@ def main() -> None:
             stamp = time.strftime("%Y-%m-%d %H:%M")
             print(f"{stamp}  {ASSET} ${data['price']:,.2f}  paid ${price:.3f}  run total ${spent:.3f}"
                   + ("  ALERT" if message else ""))
-            if message and not alerted:
-                telegram(f"{message}. (SwapHunt x402 price check, not investment advice)")
-            alerted = bool(message)  # alert once per crossing, again only after it clears
+            if not message:
+                alerted = False  # back on the safe side: the next crossing alerts again
+            elif not alerted:
+                # Alert once per crossing. If delivery fails, the next check tries again.
+                alerted = telegram(f"{message}. (SwapHunt x402 price check, not investment advice)")
+            save_alerted(state_rule, alerted)
         if ONCE:
             print(f"This run cost ${spent:.3f}.")
             return

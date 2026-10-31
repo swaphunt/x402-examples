@@ -7,9 +7,11 @@ Checks one price at a fixed interval, paying $0.001 per check with x402, and sen
 | Endpoint | `/v1/tools/price` ($0.001 per check) |
 | Threshold | `ALERT_BELOW` or `ALERT_ABOVE` (set exactly one) |
 | Delivery | Telegram |
-| Cost | $0.001 × checks per day: $0.096/day at 15 minutes, $0.024/day at 60 minutes |
+| Cost | $0.001 per check: $0.096/day and $2.88/month at 15 minutes; $0.024/day and $0.72/month at 60 minutes |
 
-It alerts once when the price crosses the threshold, and again only after the price has gone back and crossed again.
+It alerts once when the price crosses the threshold, and again only after the price has gone back and crossed again. The last state is kept in a small file (`.alert-state.json` next to the script, or `ALERT_STATE_FILE`), so this also works when cron starts a new process for every check. Changing the asset or threshold starts fresh. If Telegram delivery fails, the next check tries again.
+
+**Telegram delivery is not tested yet.** The paid price checks, the threshold logic and the state file are tested on Base mainnet. Sending to Telegram was only tested with a mocked send and with an invalid token (the error is reported without the token).
 
 ## Setup
 
@@ -44,6 +46,7 @@ set -a; . ../.env; set +a
 | `ALERT_INTERVAL_MIN` | `15` | Minutes between checks |
 | `MAX_SPEND_USD` | `0.10` | Cap per run; the bot stops before exceeding it (about 100 checks) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | | Where alerts go |
+| `ALERT_STATE_FILE` | `.alert-state.json` next to `alert.py` | Remembers whether the last check was already past the threshold |
 
 Running continuously at 15 minutes, the default cap of $0.10 lasts about 25 hours. Raise `MAX_SPEND_USD` for longer runs, or use cron with `--once`, where each run is capped on its own.
 
@@ -75,6 +78,6 @@ One check every 15 minutes, each run capped by `MAX_SPEND_USD`:
 */15 * * * * cd /path/to/x402-examples/alert-bot && set -a && . ../.env && set +a && PYTHONUNBUFFERED=1 .venv/bin/python alert.py --pay --once >> alert.log 2>&1
 ```
 
-With cron each run is a new process, so the bot can't remember that it already alerted: you get a message on every check while the price stays past the threshold. For one message per crossing, run it continuously instead (for example as a systemd service with `--pay`).
+Each run reads and updates the state file, so you get one message per crossing, not one per check.
 
 Nothing here is investment advice.
