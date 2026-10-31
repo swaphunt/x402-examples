@@ -28,8 +28,10 @@ ENDPOINTS = [  # (path, query params)
 ]
 MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
 PAY = "--pay" in sys.argv or os.getenv("X402_PAY") == "1"
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")  # anthropic | none
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-5-5")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")  # anthropic | ollama | none
+DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "ollama": "qwen3.5:9b"}
+LLM_MODEL = os.getenv("LLM_MODEL") or DEFAULT_MODELS.get(LLM_PROVIDER, "")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 DELIVERY = os.getenv("DELIVERY", "stdout")  # stdout | telegram | discord | email
 
 SYSTEM_PROMPT = (
@@ -106,18 +108,21 @@ def summarize(data: dict) -> tuple[str, str]:
     """Return (brief text, token usage line)."""
     if LLM_PROVIDER == "none":
         return json.dumps(data, indent=2), "LLM: none"
+    today = datetime.now(timezone.utc).strftime("%A %d %B %Y")
+    prompt = f"Today is {today} (UTC).\n<data>\n{json.dumps(data)}\n</data>"
+    if LLM_PROVIDER == "ollama":
+        return summarize_ollama(prompt)
     if LLM_PROVIDER != "anthropic":
-        stop(f"Unknown LLM_PROVIDER={LLM_PROVIDER!r} (use anthropic or none).")
+        stop(f"Unknown LLM_PROVIDER={LLM_PROVIDER!r} (use anthropic, ollama or none).")
 
     import anthropic
 
-    today = datetime.now(timezone.utc).strftime("%A %d %B %Y")
     request = dict(
         model=LLM_MODEL,
         max_tokens=16000,
         output_config={"effort": "low"},  # a short summary needs little reasoning
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Today is {today} (UTC).\n<data>\n{json.dumps(data)}\n</data>"}],
+        messages=[{"role": "user", "content": prompt}],
     )
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
     if LLM_MODEL in {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}:
@@ -130,6 +135,21 @@ def summarize(data: dict) -> tuple[str, str]:
     text = "".join(b.text for b in resp.content if b.type == "text").strip()
     usage = f"LLM: {resp.model}, {resp.usage.input_tokens} input + {resp.usage.output_tokens} output tokens"
     return text, usage
+
+
+def summarize_ollama(prompt: str) -> tuple[str, str]:
+    """Local model via Ollama's chat API. Free, no API key."""
+    r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=300, json={
+        "model": LLM_MODEL,
+        "stream": False,
+        "think": False,  # skip the reasoning trace on thinking models; a summary doesn't need it
+        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+    })
+    if r.is_error:
+        stop(f"Ollama error: HTTP {r.status_code} {r.text[:200]}")
+    body = r.json()
+    usage = f"LLM: {LLM_MODEL} (local), {body.get('prompt_eval_count', 0)} input + {body.get('eval_count', 0)} output tokens"
+    return body["message"]["content"].strip(), usage
 
 
 def post_json(url: str, payload: dict, channel: str) -> None:
@@ -180,8 +200,16 @@ async def main() -> None:
         stop(f"Run total ${total:.3f} exceeds MAX_SPEND_USD={MAX_SPEND}. Not paying.")
     if not os.getenv("PRIVATE_KEY"):
         stop("Set PRIVATE_KEY (a dedicated wallet with a few dollars of USDC on Base).")
+    # Check the LLM is usable before paying for data.
     if LLM_PROVIDER == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
-        stop("Set ANTHROPIC_API_KEY, or LLM_PROVIDER=none to deliver the raw data.")
+        stop("Set ANTHROPIC_API_KEY, or use LLM_PROVIDER=ollama (local) or none (raw data).")
+    if LLM_PROVIDER == "ollama":
+        try:
+            models = [m["name"] for m in httpx.get(f"{OLLAMA_URL}/api/tags", timeout=5).json()["models"]]
+        except httpx.HTTPError:
+            stop(f"Ollama not reachable at {OLLAMA_URL}. Start it with `ollama serve`.")
+        if LLM_MODEL not in models:
+            stop(f"Ollama model {LLM_MODEL} not found. Run `ollama pull {LLM_MODEL}`.")
 
     data, spent = await fetch_paid(quotes)
     text, usage = summarize(data)
