@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.swaphunt/swaphunt-mcp",
   "title": "SwapHunt crypto market context",
-  "description": "20 crypto market tools for AI agents (regime, volatility, sentiment), paid per call in USDC via x402",
-  "version": "0.1.0",
+  "description": "Hyperliquid prices, regime, volatility and funding, plus Fear & Greed; paid per call in USDC (x402)",
+  "version": "0.3.0",
   "websiteUrl": "https://x402.swaphunt.dev/docs",
   "repository": {
     "url": "https://github.com/swaphunt/x402-examples",
@@ -22,7 +22,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "swaphunt-mcp",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

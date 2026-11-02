@@ -40,10 +40,13 @@ mcp = MCPServer(
     website_url="https://x402.swaphunt.dev/docs",
     icons=[Icon(src=ICON_URL, mime_type="image/png", sizes=["512x512"])],
     instructions=(
-        "Crypto market context for trading decisions: prices, regime, volatility, sentiment, "
-        "derivatives, macro events and anti-FOMO sanity checks. Every tool except get_spending "
+        "Crypto market context: the Fear & Greed Index (current, compared and history), the "
+        "halving countdown, trading session and weekend liquidity, and tools computed from Hyperliquid "
+        "perpetuals (USDC-margined): prices in USDC, BTC market regime, chop detection, volatility, "
+        "expected move, hourly funding rates and the Alt Season Index. Every tool except get_spending "
         "costs real USDC per call (price in each description), with a per-session spending cap. "
-        "Prefer one well-chosen call over many. Nothing returned is investment advice."
+        "Prefer one well-chosen call over many. When showing Fear & Greed values, include the "
+        "attribution text from the result. Nothing returned is investment advice."
     ),
 )
 
@@ -148,117 +151,136 @@ async def get_spending() -> dict:
             "cap_usd": MAX_SPEND, "remaining_usd": round(MAX_SPEND - _spent, 6)}
 
 
-# --- Price ------------------------------------------------------------------
+# --- Fear & Greed -----------------------------------------------------------
+# Alternative.me asks for attribution next to its data: show the `attribution` field with the values.
 
-@paid(0.001, "Live spot price of one asset with 24h change, high, low and volume.")
-async def get_price(asset: str = "BTC", currency: str = "USD") -> dict:
-    return await call("/v1/tools/price", 0.001, asset=asset, currency=currency)
-
-
-@paid(0.003, "Spot prices for up to 20 assets in one call (comma-separated, e.g. 'BTC,ETH,SOL').")
-async def get_prices(assets: str = "BTC,ETH", currency: str = "USD") -> dict:
-    return await call("/v1/tools/price/multi", 0.003, assets=assets, currency=currency)
-
-
-# --- Market -----------------------------------------------------------------
-
-@paid(0.001, "Crypto Fear & Greed Index (0-100) with its label, updated daily.")
+@paid(0.001, "Crypto Fear & Greed Index (0-100) with its label, updated daily. "
+             "When showing the value, include the `attribution` text from the result.")
 async def get_fear_greed() -> dict:
     return await call("/v1/market/fear-greed", 0.001)
 
 
-@paid(0.002, "Whole-market snapshot: total market cap, 24h volume, BTC and ETH dominance.")
-async def get_market_overview() -> dict:
-    return await call("/v1/market/global", 0.002)
+@paid(0.002, "Fear & Greed Index now vs yesterday, 7 and 30 days ago, with the changes. "
+             "When showing the values, include the `attribution` text from the result.")
+async def get_fear_greed_compare() -> dict:
+    return await call("/v1/market/fear-greed/compare", 0.002)
 
 
-@paid(0.003, "Alt-season read: Altcoin Season Index plus how many top alts beat BTC over `days` (1-30).")
-async def get_alt_season(days: int = 7) -> dict:
-    return await call("/v1/market/alt-season", 0.003, days=days)
+@paid(0.005, "Daily Fear & Greed history: the last `days` (up to 365), or `start_date` to `end_date` "
+             "(YYYY-MM-DD). When showing the values, include the `attribution` text from the result.")
+async def get_fear_greed_history(days: int = 30, start_date: str | None = None,
+                                 end_date: str | None = None) -> dict:
+    return await call("/v1/market/fear-greed/history", 0.005, days=days, start_date=start_date, end_date=end_date)
 
 
-@paid(0.003, "Top and bottom coins by return over `period` (24h, 7d, 30d); `limit` 1-20.")
-async def get_momentum_rank(period: str = "24h", limit: int = 10) -> dict:
-    return await call("/v1/market/momentum-rank", 0.003, period=period, limit=limit)
+# --- Halving ----------------------------------------------------------------
+
+@paid(0.001, "Halving countdown for `coin` (BTC or LTC): blocks remaining and estimated date of the next halving.")
+async def get_halving(coin: str = "BTC") -> dict:
+    return await call("/v1/market/halving", 0.001, coin=coin)
 
 
-# --- Sentiment --------------------------------------------------------------
-@paid(0.005, "Recent crypto headlines, each scored 1-10 for trading impact with a bullish/bearish tag.")
-async def get_crypto_news(hours: int = 24, min_score: int | None = None, limit: int = 10) -> dict:
-    return await call("/v1/sentiment/news", 0.005, hours=hours, min_score=min_score, limit=limit)
+# --- Hyperliquid perpetuals -------------------------------------------------
+# Everything below is computed from Hyperliquid perpetuals (USDC-margined); prices are in USDC.
+
+HL = "From Hyperliquid perpetuals (USDC-margined)."
 
 
-@paid(0.003, "Aggregated news sentiment (strong_bearish to strong_bullish) over the last `hours`.")
-async def get_sentiment_summary(hours: int = 24) -> dict:
-    return await call("/v1/sentiment/summary", 0.003, hours=hours)
+@paid(0.001, "Live price of one asset in USDC: perp mark price (`price_type` mark) or order-book mid "
+             "(`price_type` mid), with 24h change and 24h volume. `asset` is any active perp (BTC, ETH, SOL ...; "
+             f"BTCUSDT and BTC-PERP also mean BTC). `currency` is USDC (USD and USDT accepted as aliases). {HL}")
+async def get_price(asset: str = "BTC", currency: str = "USDC", price_type: str = "mark") -> dict:
+    return await call("/v1/tools/price", 0.001, asset=asset, currency=currency, price_type=price_type)
 
 
-# --- Regime and volatility --------------------------------------------------
+@paid(0.003, "Prices in USDC for up to 20 assets in one call (`assets` comma-separated, e.g. 'BTC,ETH,SOL'), "
+             "each with 24h change and volume; unknown symbols are skipped. `price_type` mark or mid. "
+             f"Cheaper than several get_price calls. {HL}")
+async def get_prices(assets: str = "BTC,ETH", currency: str = "USDC", price_type: str = "mark") -> dict:
+    return await call("/v1/tools/price/multi", 0.003, assets=assets, currency=currency, price_type=price_type)
 
-@paid(0.002, "Current BTC market regime (BULLISH/BEARISH/NEUTRAL) from price vs the 12h EMA20.")
+
+@paid(0.001, "List of every asset get_price and get_prices can quote: all active perps, by Hyperliquid name "
+             f"(e.g. kPEPE = 1,000 PEPE). {HL}")
+async def get_supported_assets() -> dict:
+    return await call("/v1/tools/price/supported", 0.001)
+
+
+@paid(0.002, "Current BTC market regime (BULLISH/BEARISH/NEUTRAL): BTC perp price vs its 20-period EMA on 12h "
+             f"candles, with EMA value and slope. Updates at 00:00 and 12:00 UTC. {HL}")
 async def get_market_regime() -> dict:
     return await call("/v1/regime/current", 0.002)
 
 
-@paid(0.003, "Is the asset trending or chopping? ADX-based, on `timeframe` (1h, 4h, 1d).")
-async def get_chop_detection(asset: str = "BTC", timeframe: str = "4h") -> dict:
-    return await call("/v1/regime/chop-detection", 0.003, asset=asset, timeframe=timeframe)
+@paid(0.003, "Is `asset` trending or chopping? ADX-based, with +DI/-DI and trend direction, on `timeframe` "
+             f"(1h, 4h, 1d). `quote` is USDC (USD and USDT accepted as aliases). {HL}")
+async def get_chop_detection(asset: str = "BTC", timeframe: str = "4h", quote: str = "USDC") -> dict:
+    return await call("/v1/regime/chop-detection", 0.003, asset=asset, timeframe=timeframe, quote=quote)
 
 
-@paid(0.002, "Realized volatility (daily and annualized) with a low/normal/high/extreme level.")
-async def get_volatility(asset: str = "BTC", period: str = "30d") -> dict:
+@paid(0.002, "Realized volatility of `asset` over `period` (7d, 14d, 30d): daily and annualized %, a "
+             f"low/normal/high/extreme level and today's UTC range. Backward-looking, not implied vol. {HL}")
+async def get_volatility(asset: str = "BTC", period: str = "7d") -> dict:
     return await call("/v1/vol/realized", 0.002, asset=asset, period=period)
 
 
-# --- Context and events -----------------------------------------------------
+@paid(0.002, "Market-silence score 0-1 for `asset` over `lookback` (7d, 14d, 30d): low volume, low volatility "
+             f"and small price change combined. High silence often comes before a big move. {HL}")
+async def get_market_silence(asset: str = "BTC", lookback: str = "7d") -> dict:
+    return await call("/v1/vol/silence", 0.002, asset=asset, lookback=lookback)
+
+
+@paid(0.003, "Volatility squeeze detector (Bollinger band width and its percentile) for `asset` on `timeframe` "
+             "(1h, 4h, 1d): extreme/strong/moderate/none. Detects the setup, not the direction. "
+             f"`quote` is USDC (USD and USDT accepted as aliases). {HL}")
+async def get_compression_alert(asset: str = "BTC", timeframe: str = "4h", quote: str = "USDC") -> dict:
+    return await call("/v1/vol/compression-alert", 0.003, asset=asset, timeframe=timeframe, quote=quote)
+
+
+@paid(0.003, "ATR-based expected price range for `asset` over `period` (4h, 1d, 1w): 68% and 95% bands around "
+             "the current price, in USDC. A statistical range, not a forecast. "
+             f"`quote` is USDC (USD and USDT accepted as aliases). {HL}")
+async def get_expected_move(asset: str = "BTC", period: str = "1d", quote: str = "USDC") -> dict:
+    return await call("/v1/vol/expected-move", 0.003, asset=asset, period=period, quote=quote)
+
+
+@paid(0.003, "Current funding rates for up to 20 coins (`symbols` comma-separated, e.g. 'BTC,ETH,SOL'). Funding "
+             "is hourly: funding_rate_pct is the hourly rate, annualized = hourly x 8760; with 7d/30d averages "
+             f"and a crowding signal. Positive = longs pay shorts. {HL}")
+async def get_funding_rates(symbols: str = "BTC,ETH,SOL") -> dict:
+    return await call("/v1/derivatives/funding-rates", 0.003, symbols=symbols)
+
+
+@paid(0.003, "Leaderboard of the `limit` (1-50) most extreme current funding rates across all active perps, "
+             "`sort` highest (crowded longs) or lowest (crowded shorts). Hourly funding, annualized = hourly x 8760. "
+             f"{HL}")
+async def get_top_funding_rates(limit: int = 10, sort: str = "highest") -> dict:
+    return await call("/v1/derivatives/funding-rates/top", 0.003, limit=limit, sort=sort)
+
+
+@paid(0.004, "Settled hourly funding history for one coin (`symbol`) over the last `days` (1-365): average, "
+             "range, share of positive hours and the percentile of the latest rate. `history_days` in the result "
+             f"shows how much history that coin has. Annualized = hourly x 8760. {HL}")
+async def get_funding_history(symbol: str = "BTC", days: int = 90) -> dict:
+    return await call("/v1/derivatives/funding-rates/history", 0.004, symbol=symbol, days=days)
+
+
+@paid(0.003, "SwapHunt Alt Season Index (0-100), daily: share of the top 100 perps by 30-day volume (excl. BTC "
+             f"and stablecoins) that beat BTC over 90 days. >=75 alt season, <=25 bitcoin season. {HL}")
+async def get_alt_season() -> dict:
+    return await call("/v1/market/alt-season", 0.003)
+
+
+# --- Trading context --------------------------------------------------------
 
 @paid(0.001, "Current trading session (Asia, London, New York, off-hours) and its typical volatility.")
 async def get_trading_session() -> dict:
     return await call("/v1/context/session", 0.001)
 
 
-@paid(0.003, "Upcoming macro events (FOMC, CPI, NFP ...) for the next `days`, optionally high-impact only.")
-async def get_macro_events(days: int = 7, high_impact_only: bool = False) -> dict:
-    return await call("/v1/events/macro", 0.003, days=days, high_impact_only=str(high_impact_only).lower())
-
-
-# --- Derivatives ------------------------------------------------------------
-
-@paid(0.003, "Live perpetual funding rates for up to 20 symbols (comma-separated). Positive = longs pay shorts.")
-async def get_funding_rates(symbols: str = "BTC,ETH,SOL") -> dict:
-    return await call("/v1/derivatives/funding-rates", 0.003, symbols=symbols)
-
-
-@paid(0.003, "Long/short liquidations for BTC, ETH, SOL, XRP or BNB in the last 1-60 `minutes`.")
-async def get_liquidations(coin: str = "BTC", minutes: int = 5) -> dict:
-    return await call("/v1/derivatives/liquidations", 0.003, coin=coin, minutes=minutes)
-
-
-# --- Sanity checks and anti-FOMO --------------------------------------------
-
-@paid(0.003, "Is this drop a statistically significant dip or noise? Compares the move with ATR.")
-async def is_this_a_dip(symbol: str = "BTC") -> dict:
-    return await call("/v1/sanity/is-this-a-dip", 0.003, symbol=symbol)
-
-
-@paid(0.003, "Is a breakout from price `level` real or a fakeout? `direction` up or down.")
-async def is_this_a_breakout(level: float, symbol: str = "BTC", direction: str = "up") -> dict:
-    return await call("/v1/sanity/is-this-a-breakout", 0.003, symbol=symbol, level=level, direction=direction)
-
-
-@paid(0.003, "Multi-timeframe RSI oversold check (1h/4h/1d blended).")
-async def is_this_oversold(symbol: str = "BTC") -> dict:
-    return await call("/v1/sanity/is-this-oversold", 0.003, symbol=symbol)
-
-
-@paid(0.003, "FOMO guard: how far price has run from the recent swing low (early/mid/late).")
-async def how_late_am_i(symbol: str = "BTC") -> dict:
-    return await call("/v1/fomo/how-late-am-i", 0.003, symbol=symbol)
-
-
-@paid(0.003, "Is price over-extended from its MA20/MA50 and Bollinger bands? Returns a z-score.")
-async def is_price_extended(symbol: str = "BTC") -> dict:
-    return await call("/v1/fomo/already-extended", 0.003, symbol=symbol)
+@paid(0.001, "Is it a weekend or low-liquidity window right now? Returns a 0-100 liquidity score and the session.")
+async def get_weekend_liquidity() -> dict:
+    return await call("/v1/context/weekend-liquidity", 0.001)
 
 
 # --- Maintainer check -------------------------------------------------------
@@ -271,9 +293,8 @@ async def check_prices() -> None:
     pairs = re.findall(r'await call\("([^"]+)", ([0-9.]+)', src)
     bad = 0
     for path, adv in pairs:
-        extra = {"level": 1} if path.endswith("breakout") else {}
         try:
-            live = _usd(await _quote(path, extra))
+            live = _usd(await _quote(path, {}))
         except Exception as e:
             bad += 1
             print(f"ERR {path:<36} {str(e)[:60]}")

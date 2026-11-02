@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.swaphunt/swaphunt-mcp -->
 
-An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 20 SwapHunt tools: prices, market regime, volatility, sentiment, derivatives, macro events and anti-FOMO sanity checks. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
+An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 19 paid SwapHunt tools: prices, BTC market regime, chop detection, volatility, expected move, funding rates and the Alt Season Index, all computed from Hyperliquid perpetuals (USDC-margined); plus the Crypto Fear & Greed Index (current, compared with earlier days, and daily history), the halving countdown, and the current trading session and weekend liquidity. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
 
 Every tool description states its price, so the agent can see what a call costs before making it.
 
@@ -12,21 +12,37 @@ uvx swaphunt-mcp            # needs uv: https://docs.astral.sh/uv/
 
 ## Tools
 
-| Tool | Price | Tool | Price |
-|---|---|---|---|
-| `get_spending` | free | `get_volatility` | $0.002 |
-| `get_price` | $0.001 | `get_trading_session` | $0.001 |
-| `get_prices` | $0.003 | `get_macro_events` | $0.003 |
-| `get_fear_greed` | $0.001 | `get_funding_rates` | $0.003 |
-| `get_market_overview` | $0.002 | `get_liquidations` | $0.003 |
-| `get_alt_season` | $0.003 | `is_this_a_dip` | $0.003 |
-| `get_momentum_rank` | $0.003 | `is_this_a_breakout` | $0.003 |
-| `get_crypto_news` | $0.005 | `is_this_oversold` | $0.003 |
-| `get_sentiment_summary` | $0.003 | `how_late_am_i` | $0.003 |
-| `get_market_regime` | $0.002 | `is_price_extended` | $0.003 |
-| `get_chop_detection` | $0.003 | | |
+| Tool | Price | What it returns |
+|---|---|---|
+| `get_spending` | free | What the session has spent and how much budget is left |
+| `get_fear_greed` | $0.001 | Crypto Fear & Greed Index (0-100) with its label |
+| `get_fear_greed_compare` | $0.002 | The index now vs yesterday, 7 and 30 days ago, with the changes |
+| `get_fear_greed_history` | $0.005 | Daily index values for up to 365 days |
+| `get_halving` | $0.001 | Halving countdown for BTC or LTC |
+| `get_trading_session` | $0.001 | Current trading session and its typical volatility |
+| `get_weekend_liquidity` | $0.001 | Weekend or low-liquidity window, with a 0-100 liquidity score |
 
-`get_spending` is free and shows what the session has spent and how much budget is left.
+### From Hyperliquid perpetuals (USDC-margined)
+
+These tools are computed from Hyperliquid perpetuals, and every result has `"source": "Hyperliquid perpetuals"`. Prices are in USDC (`USD` and `USDT` are accepted as aliases). Funding is settled hourly; the annualized rate is the hourly rate x 8760.
+
+| Tool | Price | What it returns |
+|---|---|---|
+| `get_price` | $0.001 | One asset's price in USDC (`price_type` `mark` or `mid`), 24h change and volume |
+| `get_prices` | $0.003 | Prices for up to 20 assets in one call |
+| `get_supported_assets` | $0.001 | Every asset the price tools can quote (all active Hyperliquid perps) |
+| `get_market_regime` | $0.002 | BTC regime (BULLISH/BEARISH/NEUTRAL) from price vs the 12h EMA20 |
+| `get_chop_detection` | $0.003 | Trending or chopping (ADX, +DI/-DI) on 1h, 4h or 1d |
+| `get_volatility` | $0.002 | Realized volatility over 7d, 14d or 30d with a low/normal/high/extreme level |
+| `get_market_silence` | $0.002 | Market-silence score 0-1 (low volume, low volatility, small moves) |
+| `get_compression_alert` | $0.003 | Volatility squeeze (Bollinger band width percentile) on 1h, 4h or 1d |
+| `get_expected_move` | $0.003 | ATR-based 68% and 95% price ranges for 4h, 1d or 1w |
+| `get_funding_rates` | $0.003 | Current hourly funding for up to 20 coins, annualized, with 7d/30d averages |
+| `get_top_funding_rates` | $0.003 | The most positive or most negative funding rates across all perps |
+| `get_funding_history` | $0.004 | Hourly funding history for one coin, up to 365 days, with percentile of the latest rate |
+| `get_alt_season` | $0.003 | SwapHunt Alt Season Index (0-100): share of top perps beating BTC over 90 days |
+
+Fear & Greed results include an `attribution` field. Alternative.me, the source of the index, asks for that text next to its data, and the tool descriptions tell the agent to include it.
 
 ## Setup
 
@@ -52,8 +68,6 @@ The server runs with [uv](https://docs.astral.sh/uv/)'s `uvx`, which downloads i
 
 Each payment is also locked to the price, asset (USDC), network (Base) and `payTo` address the API quoted for that call, and a tool refuses to pay more than the price in its description. If a call fails after the payment was sent, it still counts against the cap and is reported as "possibly paid".
 
-Tool results include third-party text (news headlines). The spending cap and price checks still apply whatever the agent is told.
-
 ## Claude Code
 
 ```bash
@@ -64,7 +78,13 @@ claude mcp add swaphunt \
   -- uvx swaphunt-mcp
 ```
 
-Then ask, for example: *"What's the crypto market mood today, and is BTC trending or chopping on the 4h chart?"*
+Then ask, for example:
+
+- *"What's the crypto market mood today, how has it changed over the past month, and how long until the next Bitcoin halving?"*
+- *"What are BTC, ETH and SOL trading at, and is BTC in a bullish or bearish regime right now?"*
+- *"Is ETH chopping or trending on the 4h chart, and is its volatility compressing?"*
+- *"Which coins have the most crowded longs by funding, and is BTC's current funding unusual compared with the last 90 days?"*
+- *"How far could SOL move today, and are we in alt season?"*
 
 ## Claude Desktop
 

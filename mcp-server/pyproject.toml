@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "swaphunt-mcp"
 dynamic = ["version"]
-description = "MCP server with 20 SwapHunt crypto market tools for AI agents, paid per call in USDC via x402"
+description = "MCP server with 19 SwapHunt crypto market tools for AI agents (Hyperliquid prices, regime, volatility, funding; Fear & Greed), paid per call in USDC via x402"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
