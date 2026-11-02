@@ -108,4 +108,4 @@ Open the basescan link to see the USDC transfer on-chain.
 4. A facilitator (Coinbase CDP) settles the payment on Base and the API returns `200` with the data.
    The `PAYMENT-RESPONSE` header contains the transaction hash.
 
-All 42 endpoints and their prices: [`../docs/endpoints.md`](../docs/endpoints.md).
+All 19 endpoints and their prices: [`../docs/endpoints.md`](../docs/endpoints.md).

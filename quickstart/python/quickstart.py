@@ -10,7 +10,7 @@ from x402.mechanisms.evm import EthAccountSigner
 from x402.mechanisms.evm.exact.register import register_exact_evm_client
 
 URL = "https://x402.swaphunt.dev/v1/market/fear-greed"
-MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
+MAX_SPEND = float(os.getenv("MAX_SPEND_USD") or "0.10")
 PAY = "--pay" in sys.argv or os.getenv("X402_PAY") == "1"
 
 

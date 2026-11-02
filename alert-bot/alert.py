@@ -25,7 +25,7 @@ ASSET = os.getenv("ALERT_ASSET") or "BTC"
 BELOW = float(os.environ["ALERT_BELOW"]) if os.getenv("ALERT_BELOW") else None
 ABOVE = float(os.environ["ALERT_ABOVE"]) if os.getenv("ALERT_ABOVE") else None
 INTERVAL_MIN = float(os.getenv("ALERT_INTERVAL_MIN") or "15")
-MAX_SPEND = float(os.getenv("MAX_SPEND_USD", "0.10"))
+MAX_SPEND = float(os.getenv("MAX_SPEND_USD") or "0.10")
 PAY = "--pay" in sys.argv or os.getenv("X402_PAY") == "1"
 ONCE = "--once" in sys.argv
 STATE_FILE = os.path.expanduser(os.getenv("ALERT_STATE_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), ".alert-state.json"))

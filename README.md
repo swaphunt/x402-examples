@@ -1,6 +1,6 @@
 # SwapHunt x402 examples
 
-[SwapHunt](https://swaphunt.dev)'s x402 API sells crypto market context per call (prices, regime, volatility, sentiment, funding, macro events, anti-FOMO checks), paid in USDC on Base, Polygon, Arbitrum or Solana with the [x402 protocol](https://x402.org). No account, no API key: the payment is the credential.
+[SwapHunt](https://swaphunt.dev)'s x402 API sells crypto market context per call (prices, market regime, volatility and funding computed from Hyperliquid perpetuals, alt season, the Crypto Fear & Greed Index, the halving countdown, trading session and weekend liquidity), paid in USDC on Base, Polygon, Arbitrum or Solana with the [x402 protocol](https://x402.org). No account, no API key: the payment is the credential.
 
 The examples pay on Base. Every endpoint has the same price on all four networks; see [docs/endpoints.md](docs/endpoints.md) for the network list.
 
@@ -11,11 +11,13 @@ These examples get you from zero to a paid call in a few minutes, and show how t
 | Example | Language | What it does | Cost per run |
 |---|---|---|---|
 | [quickstart](quickstart/) | Python, TypeScript | One paid call to `/v1/market/fear-greed` | $0.001 |
-| [daily-brief](daily-brief/) | Python | Four endpoints, summarized by an LLM, delivered to stdout, Telegram, Discord or email | $0.008 + LLM (Haiku 5.5: $0.0002) |
-| [mcp-server](mcp-server/) | Python (`uvx swaphunt-mcp`) | 20 SwapHunt tools for Claude and other AI agents, paid per call with a session cap | $0.001-0.005 per tool call |
+| [daily-brief](daily-brief/) | Python | Fear & Greed with its 1, 7 and 30-day changes, halving countdown, trading session and weekend liquidity, summarized by an LLM and delivered to stdout, Telegram, Discord or email | $0.005 + LLM tokens |
+| [mcp-server](mcp-server/) | Python (`uvx swaphunt-mcp`) | 19 SwapHunt tools (Hyperliquid prices, regime, volatility, funding; Fear & Greed) for Claude and other AI agents, paid per call with a session cap | $0.001-0.005 per tool call |
 | [alert-bot](alert-bot/) | Python | Checks one price on an interval and messages you on Telegram when it crosses a threshold | $0.001 per check |
 
-All 42 endpoints with prices, parameters and example responses: [docs/endpoints.md](docs/endpoints.md). Prices range from $0.001 to $0.008 per call.
+All 19 endpoints with prices, parameters and example responses: [docs/endpoints.md](docs/endpoints.md). Prices range from $0.001 to $0.005 per call.
+
+Fear & Greed data comes from Alternative.me, which asks for attribution next to its data. The responses include an `attribution` field with the text to show.
 
 ## Quickstart
 

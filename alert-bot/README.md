@@ -41,8 +41,8 @@ set -a; . ../.env; set +a
 
 | Variable | Default | |
 |---|---|---|
-| `ALERT_ASSET` | `BTC` | Any symbol `/v1/tools/price` supports |
-| `ALERT_BELOW` / `ALERT_ABOVE` | | Price level in USD; set exactly one |
+| `ALERT_ASSET` | `BTC` | Any Hyperliquid perp symbol `/v1/tools/price` supports |
+| `ALERT_BELOW` / `ALERT_ABOVE` | | Price level in USDC (Hyperliquid mark price); set exactly one |
 | `ALERT_INTERVAL_MIN` | `15` | Minutes between checks |
 | `MAX_SPEND_USD` | `0.10` | Cap per run; the bot stops before exceeding it (about 100 checks) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | | Where alerts go |

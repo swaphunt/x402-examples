@@ -31,9 +31,17 @@ cur = ""
 for line in (src / "pricing.py").read_text().split("DISCOVERY")[0].splitlines():
     s = line.strip()
     if s.startswith("# ") and not s.startswith("# Route"):
-        cur = s[2:]
+        cur = s[2:].split(" (")[0]  # drop maintainer notes in parentheses
     elif s.startswith('"GET '):
         cats[s.split('"')[1]] = cur
+
+# The Hyperliquid block shares one maintainer comment; give its routes readable categories by path.
+HL_CATS = [("/v1/tools/price", "Prices"), ("/v1/regime", "Regime"), ("/v1/vol", "Volatility"),
+           ("/v1/derivatives", "Funding"), ("/v1/market", "Market")]
+for r, c in cats.items():
+    if "Hyperliquid" in c:
+        path = r.split(" ", 1)[1]
+        cats[r] = next((name for prefix, name in HL_CATS if path.startswith(prefix)), "Hyperliquid") + " (Hyperliquid)"
 
 
 def trim(v, depth=0):
@@ -94,6 +102,10 @@ for a in accepts:
 L.append("\nFree routes: `/health`, `/`, `/docs`, `/openapi.json`. Rate limit: 60 requests/min per IP.\n")
 L.append(f"Generated from SwapHunt's pricing config, with real responses captured "
          f"{cap_at[:10]}. Long responses are trimmed (`…`).\n")
+L.append("Prices, regime, volatility, funding and alt season are computed from Hyperliquid perpetuals "
+         "(USDC-margined), with prices in USDC. Fear & Greed data comes from "
+         "[Alternative.me](https://alternative.me/crypto/fear-and-greed-index/); its responses include an "
+         "`attribution` field: show that text next to the data wherever you display it.\n")
 L.append("## Overview\n")
 L.append("| Category | Endpoint | Price (USDC) | Params |")
 L.append("|---|---|---|---|")

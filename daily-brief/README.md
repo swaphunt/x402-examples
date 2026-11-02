@@ -2,25 +2,21 @@
 
 Pays for four SwapHunt endpoints with x402, has an LLM write a short market brief in plain English, and delivers it to stdout, Telegram, Discord or email. Built to run once a day from cron.
 
+The example shows the mechanics: paying several x402 endpoints in one run, keeping the spend under a cap, and having an LLM turn the answers into a few sentences. It is not a full market report. The data covers market sentiment, the halving countdown and trading session context, not prices or news.
+
 | Endpoint | Price | What it adds |
 |---|---|---|
-| `/v1/market/fear-greed` | $0.001 | Market mood (0-100) |
-| `/v1/regime/current` | $0.002 | BTC regime: bullish, bearish or neutral |
-| `/v1/market/global` | $0.002 | Total market cap, volume, BTC dominance |
-| `/v1/events/macro?days=7&high_impact_only=true` | $0.003 | High-impact macro events this week |
-| **Total per run** | **$0.008** | |
+| `/v1/market/fear-greed/compare` | $0.002 | Market mood (Fear & Greed Index, 0-100) today, with the change over 1, 7 and 30 days |
+| `/v1/market/halving?coin=BTC` | $0.001 | Bitcoin halving countdown: blocks and estimated days remaining |
+| `/v1/context/session` | $0.001 | Current trading session (Asia, London, New York, off-hours) and its typical volatility |
+| `/v1/context/weekend-liquidity` | $0.001 | Weekend or low-liquidity window, with a 0-100 liquidity score |
+| **Total per run** | **$0.005** | $0.15 per month at one run a day |
 
-The LLM writing the brief is extra. Measured on 31 October 2026; the script prints the token counts on every run:
+The session and liquidity readings describe the moment the script runs, so pick a cron time that matters to you.
 
-| LLM | Price per MTok (in / out) | Tokens per run | LLM per run | Total per run | Total per month (30 runs) |
-|---|---|---|---|---|---|
-| Claude Haiku 5.5 (default) | $0.10 / $0.50 | 765 in + 270 out | $0.0002 | $0.0082 | $0.25 |
-| Claude Opus 5.5 (`LLM_MODEL=claude-opus-5-5`) | $4 / $20 | 755 in + 505 out | $0.0131 | $0.0211 | $0.63 |
-| Local model via Ollama (`LLM_PROVIDER=ollama`) | free | 714 in + 194 out | $0 | $0.0080 | $0.24 |
+The LLM writing the brief is extra. The script prints the input and output token counts on every run, so you can work out the cost from your provider's per-token prices ([Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)). With `LLM_PROVIDER=ollama` the LLM is free and a run costs only the $0.005 in x402 payments.
 
-Claude prices from [Anthropic's pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (Haiku 5.5 rate for prompts up to 100k tokens).
-
-Haiku is plenty for a fact summary like this. Opus writes a somewhat richer brief if you want it.
+The Fear & Greed data comes from Alternative.me, which asks for attribution next to its data. The script adds that attribution line below the brief (a fixed text, not taken from the API response).
 
 ## Setup
 
@@ -38,7 +34,7 @@ cp ../.env.example ../.env    # then fill in PRIVATE_KEY and the LLM / delivery 
 ```bash
 set -a; . ../.env; set +a        # load settings into the environment
 .venv/bin/python brief.py        # dry run: shows prices, pays nothing, no LLM call
-.venv/bin/python brief.py --pay  # pays $0.008, writes and delivers the brief
+.venv/bin/python brief.py --pay  # pays $0.005, writes and delivers the brief
 ```
 
 Before paying, the script checks that the run total stays under `MAX_SPEND_USD` (default $0.10) and that the LLM is usable. Each payment is locked to the amount, network and `payTo` address shown in the dry run: if the server asks for anything else, the script refuses to pay.
@@ -61,40 +57,19 @@ Dry run:
 
 ```
 Prices (from the 402 responses):
-  /v1/market/fear-greed    $0.001  eip155:8453  payTo 0x<swaphunt-address>
-  /v1/regime/current       $0.002  eip155:8453  payTo 0x<swaphunt-address>
-  /v1/market/global        $0.002  eip155:8453  payTo 0x<swaphunt-address>
-  /v1/events/macro         $0.003  eip155:8453  payTo 0x<swaphunt-address>
-  total: $0.008 per run (cap MAX_SPEND_USD=0.1)
+  /v1/market/fear-greed/compare    $0.002  eip155:8453  payTo 0x<swaphunt-address>
+  /v1/market/halving               $0.001  eip155:8453  payTo 0x<swaphunt-address>
+  /v1/context/session              $0.001  eip155:8453  payTo 0x<swaphunt-address>
+  /v1/context/weekend-liquidity    $0.001  eip155:8453  payTo 0x<swaphunt-address>
+  total: $0.005 per run (cap MAX_SPEND_USD=0.1)
 Dry run: nothing paid, no LLM call. Re-run with --pay to pay.
 ```
 
-Paid run with the default `LLM_PROVIDER=anthropic` (31 October 2026):
+A paid run prints one `paying $0.00x for /v1/... ok (tx 0x<hash>…)` line per endpoint, then the brief (5-8 sentences followed by the Alternative.me attribution line), then a last line with the cost and token counts:
 
 ```
-Prices (from the 402 responses):
-  ...
-  total: $0.008 per run (cap MAX_SPEND_USD=0.1)
-  paying $0.001 for /v1/market/fear-greed ... ok (tx 0x<hash>…)
-  paying $0.002 for /v1/regime/current ... ok (tx 0x<hash>…)
-  paying $0.002 for /v1/market/global ... ok (tx 0x<hash>…)
-  paying $0.003 for /v1/events/macro ... ok (tx 0x<hash>…)
-
-Crypto brief 2026-10-31
------------------------
-Crypto sentiment is in the Fear zone today, with the Fear & Greed Index at 30 as of the latest
-reading from Alternative.me. The BTC regime is classified as BEARISH on the 12-hour timeframe,
-with price at about $77,460, roughly 2.9% below its 20-period EMA of about $79,867, and the EMA
-sloping downward at about -1.6%. The total crypto market capitalization stands near $2.60
-trillion, with 24-hour trading volume of about $61.2 billion. Bitcoin's dominance is about 59.8%
-and Ethereum's is about 10.6%. The next high-impact macro event in the data is the US Nonfarm
-Payrolls release on Friday, 6 November 2026, at 13:30 UTC, and it is the only high-impact event
-listed for the coming week.
-
-This run cost $0.008 in x402 payments. LLM: claude-haiku-5-5, 765 input + 270 output tokens
+This run cost $0.005 in x402 payments. LLM: <model>, <n> input + <n> output tokens
 ```
-
-With `LLM_MODEL=claude-opus-5-5` the brief is a little richer and the last line reads `LLM: claude-opus-5-5, 755 input + 505 output tokens`. With `LLM_PROVIDER=ollama` and `qwen3.5:9b` it takes about 20 seconds on a desktop GPU and reads `LLM: qwen3.5:9b (local), 714 input + 194 output tokens`.
 
 ## Run it daily with cron
 
