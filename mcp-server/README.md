@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.swaphunt/swaphunt-mcp -->
 
-An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 19 paid SwapHunt tools: prices, BTC market regime, chop detection, volatility, expected move, funding rates and the Alt Season Index, all computed from Hyperliquid perpetuals (USDC-margined); plus the Crypto Fear & Greed Index (current, compared with earlier days, and daily history), the halving countdown, and the current trading session and weekend liquidity. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
+An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 30 paid SwapHunt tools: prices, BTC market regime, chop detection, volatility, expected move, funding rates, the Alt Season Index, coin strength, momentum and correlation vs BTC, and anti-FOMO sanity checks (is this a dip, a breakout, support, oversold; how late am I, pump age, extension, green-candle streak), all computed from Hyperliquid perpetuals (USDC-margined); plus the Crypto Fear & Greed Index (current, compared with earlier days, and daily history), the halving countdown, and the current trading session and weekend liquidity. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
 
 Every tool description states its price, so the agent can see what a call costs before making it.
 
@@ -41,6 +41,33 @@ These tools are computed from Hyperliquid perpetuals, and every result has `"sou
 | `get_top_funding_rates` | $0.003 | The most positive or most negative funding rates across all perps |
 | `get_funding_history` | $0.004 | Hourly funding history for one coin, up to 365 days, with percentile of the latest rate |
 | `get_alt_season` | $0.003 | SwapHunt Alt Season Index (0-100): share of top perps beating BTC over 90 days |
+
+### Coin analysis and sanity checks (Hyperliquid perpetuals, top 50 coins)
+
+These tools are also computed from Hyperliquid perpetuals (USDC-margined), with prices and levels in USDC. They cover the top 50 Hyperliquid perpetuals by 30-day volume (the `covered` list from `get_supported_assets`). For any other coin the API answers `422 not_covered` before asking for payment: nothing is charged, nothing counts against the session cap, and the tool returns the covered list so the agent can pick another coin.
+
+| Tool | Price | What it returns |
+|---|---|---|
+| `get_coin_strength` | $0.003 | A coin's return minus BTC's over 24h, 7d or 30d, rated very_strong to very_weak |
+| `get_momentum_rank` | $0.003 | Covered coins ranked by return over 24h, 7d or 30d: top and bottom performers |
+| `get_correlation` | $0.003 | Pearson correlation of a coin's returns with BTC's over 7d or 30d |
+| `is_this_a_dip` | $0.003 | Drop from the 14-day high vs the 14-day ATR: real dip or noise |
+| `is_this_a_breakout` | $0.003 | Breakout through a price level up or down: confirmed or likely fakeout |
+| `is_this_support` | $0.003 | Whether a price level is real support: touches, recency and bounce quality over 90 days |
+| `is_this_oversold` | $0.003 | RSI(14) on 1h, 4h and 1d combined into a weighted RSI, with a verdict |
+| `how_late_am_i` | $0.003 | How far a move has run from its 4h swing low, in % and ATR multiples |
+| `get_pump_age` | $0.003 | Active pump detection on 15m candles: start, duration and size vs the average pump |
+| `is_price_extended` | $0.003 | Distance from the 20 and 50 MA on 4h, Bollinger position and z-score |
+| `get_green_candle_streak` | $0.003 | Current green-candle streak on 1h, 4h or 1d and how often the next candle was green |
+
+An uncovered coin returns, for example:
+
+```json
+{"error": "not_covered", "charged": false,
+ "message": "SEI is not covered yet. Covered: top 50 Hyperliquid perpetuals by 30-day volume. Nothing was paid. Retry with one of the covered coins.",
+ "symbol": "SEI", "covered": ["AAVE", "ADA", "AERO", "...", "kPEPE"],
+ "coverage_rule": "Top 50 Hyperliquid perpetuals by 30-day notional volume (stablecoins excluded), recomputed daily. ..."}
+```
 
 Fear & Greed results include an `attribution` field. Alternative.me, the source of the index, asks for that text next to its data, and the tool descriptions tell the agent to include it.
 
@@ -85,6 +112,8 @@ Then ask, for example:
 - *"Is ETH chopping or trending on the 4h chart, and is its volatility compressing?"*
 - *"Which coins have the most crowded longs by funding, and is BTC's current funding unusual compared with the last 90 days?"*
 - *"How far could SOL move today, and are we in alt season?"*
+- *"ETH dropped today. Is it a real dip or just noise, is it oversold, and how late would I be buying the bounce?"*
+- *"SOL is pumping. How old is the pump, is it already extended, and is it stronger than BTC this week?"*
 
 ## Claude Desktop
 

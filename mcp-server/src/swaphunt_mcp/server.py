@@ -43,7 +43,11 @@ mcp = MCPServer(
         "Crypto market context: the Fear & Greed Index (current, compared and history), the "
         "halving countdown, trading session and weekend liquidity, and tools computed from Hyperliquid "
         "perpetuals (USDC-margined): prices in USDC, BTC market regime, chop detection, volatility, "
-        "expected move, hourly funding rates and the Alt Season Index. Every tool except get_spending "
+        "expected move, hourly funding rates, the Alt Season Index, coin strength, momentum and "
+        "correlation vs BTC, and sanity checks (is this a dip, breakout, support, oversold; how late am I, "
+        "pump age, extension, green-candle streak). The coin-level analysis tools cover the top 50 "
+        "Hyperliquid perpetuals by 30-day volume; other coins are rejected with not_covered and not "
+        "charged. Every tool except get_spending "
         "costs real USDC per call (price in each description), with a per-session spending cap. "
         "Prefer one well-chosen call over many. When showing Fear & Greed values, include the "
         "attribution text from the result. Nothing returned is investment advice."
@@ -63,10 +67,41 @@ def _usd(req) -> float:
     return int(req.amount) / 1e6  # only valid for USDC, which _quote enforces
 
 
+class NotCovered(Exception):
+    """The API rejected the coin before asking for payment (HTTP 422 not_covered). Nothing is charged."""
+
+    def __init__(self, body: dict):
+        super().__init__(body.get("message", "not covered"))
+        self.body = body
+
+
+def _not_covered(r: httpx.Response) -> dict | None:
+    """The 422 not_covered body, or None. The API sends it before any payment is requested."""
+    if r.status_code != 422:
+        return None
+    try:
+        body = r.json()
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) and body.get("error") == "not_covered" else None
+
+
+def _not_covered_result(body: dict) -> dict:
+    """What the agent sees for an uncovered coin: a clear message and the covered list, no charge."""
+    return {"error": "not_covered", "charged": False,
+            "message": f"{body.get('message', 'This coin is not covered.')} Nothing was paid. "
+                       "Retry with one of the covered coins.",
+            "symbol": body.get("symbol"), "covered": body.get("covered", []),
+            "coverage_rule": body.get("coverage_rule")}
+
+
 async def _quote(path: str, params: dict) -> Any:
     """Unpaid request -> 402. Returns the USDC-on-Base option; any other asset or network is refused."""
     async with httpx.AsyncClient(timeout=30) as http:
         r = await http.get(BASE + path, params=params)
+    nc = _not_covered(r)
+    if nc is not None:
+        raise NotCovered(nc)
     if r.status_code != 402:
         raise RuntimeError(f"expected 402 from {path}, got {r.status_code}: {r.text[:200]}")
     for req in decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts:
@@ -95,7 +130,10 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
     """Quote, check price and budget, pay, return the data plus what it cost."""
     global _spent, _calls
     params = {k: v for k, v in params.items() if v is not None}
-    quote = await _quote(path, params)
+    try:
+        quote = await _quote(path, params)
+    except NotCovered as e:
+        return _not_covered_result(e.body)
     price = _usd(quote)
     if price > advertised:
         return {"error": f"Refused: {path} now costs ${price:.3f}, more than the advertised ${advertised:.3f}."}
@@ -128,6 +166,12 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
         return {"error": f"Possibly paid ${price:.3f}, no data: {type(e).__name__}: {str(e)[:150]}. "
                          "Counted against the session cap; check the wallet on basescan.org."}
     receipt = r.headers.get("PAYMENT-RESPONSE")
+    nc = _not_covered(r)
+    if nc is not None and not receipt:
+        # Coverage changed between quote and call; the API rejects uncovered coins before payment.
+        async with _lock:
+            _spent -= price
+        return _not_covered_result(nc)
     tx = decode_payment_response_header(receipt).transaction if receipt else None
     tx_link = f"https://basescan.org/tx/{tx}" if tx else None
     if r.status_code != 200:
@@ -269,6 +313,93 @@ async def get_funding_history(symbol: str = "BTC", days: int = 90) -> dict:
              f"and stablecoins) that beat BTC over 90 days. >=75 alt season, <=25 bitcoin season. {HL}")
 async def get_alt_season() -> dict:
     return await call("/v1/market/alt-season", 0.003)
+
+
+# --- Coin analysis (Hyperliquid perpetuals, covered coins only) -------------
+# These endpoints cover only the top 50 Hyperliquid perpetuals by 30-day volume. Other coins are
+# rejected with HTTP 422 not_covered before any payment is asked; call() returns the covered list.
+
+COV = ("Covers the top 50 Hyperliquid perpetuals by 30-day volume (list in get_supported_assets, field "
+       "`covered`); other coins are rejected with not_covered and not charged.")
+
+
+@paid(0.003, "Strength of `coin` vs BTC: the coin's return minus BTC's over `period` (24h, 7d, 30d), rated "
+             "very_strong/strong/neutral/weak/very_weak. `quote` is USDC (USD and USDT accepted as aliases). "
+             f"{HL} {COV}")
+async def get_coin_strength(coin: str = "ETH", period: str = "24h", quote: str = "USDC") -> dict:
+    return await call("/v1/market/coin-strength", 0.003, coin=coin, period=period, quote=quote)
+
+
+@paid(0.003, "Momentum leaderboard: covered coins ranked by return over `period` (24h, 7d, 30d), with the "
+             "`limit` (1-20) top and bottom performers and the full ranking. `quote` is USDC (USD and USDT "
+             f"accepted as aliases). {HL} Ranks only the top 50 Hyperliquid perpetuals by 30-day volume.")
+async def get_momentum_rank(period: str = "24h", limit: int = 10, quote: str = "USDC") -> dict:
+    return await call("/v1/market/momentum-rank", 0.003, period=period, limit=limit, quote=quote)
+
+
+@paid(0.003, "Pearson correlation (-1 to +1) of `coin`'s returns with BTC's over `period` (7d on 1h candles, "
+             "30d on 4h candles), with a level from very_high to negative. Shows whether a coin moves on its own "
+             f"or just tracks BTC. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
+async def get_correlation(coin: str = "ETH", period: str = "7d", quote: str = "USDC") -> dict:
+    return await call("/v1/market/correlation", 0.003, coin=coin, period=period, quote=quote)
+
+
+@paid(0.003, "Is this a real dip? Drop of `symbol` from its 14-day high compared with its 14-day ATR on daily "
+             "candles; a drop smaller than normal daily volatility is noise. Returns is_dip, drop_pct, atr_pct "
+             f"and a verdict. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
+async def is_this_a_dip(symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/sanity/is-this-a-dip", 0.003, symbol=symbol, quote=quote)
+
+
+@paid(0.003, "Is a breakout of `symbol` through `level` (price in USDC, required) confirmed or a likely "
+             "fakeout? `direction` up or down. Uses 1h candles: volume vs the 20-candle average and time held "
+             "beyond the level, with a fakeout probability. `quote` is USDC (USD and USDT accepted as aliases). "
+             f"{HL} {COV}")
+async def is_this_a_breakout(level: float, symbol: str = "BTC", direction: str = "up", quote: str = "USDC") -> dict:
+    return await call("/v1/sanity/is-this-a-breakout", 0.003, symbol=symbol, level=level, direction=direction,
+                      quote=quote)
+
+
+@paid(0.003, "Is `level` (price in USDC, required) real support for `symbol`? Checks 90 daily candles for "
+             "repeated, recent touches and clean bounces; returns touch_count, days_since_last_touch, "
+             f"bounce_quality and a verdict. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
+async def is_this_support(level: float, symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/sanity/is-this-support", 0.003, symbol=symbol, level=level, quote=quote)
+
+
+@paid(0.003, "Is `symbol` really oversold? RSI(14) on 1h, 4h and 1d candles combined into a weighted RSI "
+             "(20/30/50%), with a verdict. `quote` is USDC (USD and USDT accepted as aliases). "
+             f"{HL} {COV}")
+async def is_this_oversold(symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/sanity/is-this-oversold", 0.003, symbol=symbol, quote=quote)
+
+
+@paid(0.003, "How late am I to this move? Distance of `symbol` from its recent swing low on 4h candles, in % "
+             "and ATR multiples, ranked against its own history, with a verdict. `quote` is USDC (USD and USDT "
+             f"accepted as aliases). {HL} {COV}")
+async def how_late_am_i(symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/fomo/how-late-am-i", 0.003, symbol=symbol, quote=quote)
+
+
+@paid(0.003, "How old is this pump? Detects an active pump in `symbol` on the last 24 hours of 15m candles: "
+             "start time, duration, size and the average pump length, with a verdict. `quote` is USDC (USD and "
+             f"USDT accepted as aliases). {HL} {COV}")
+async def get_pump_age(symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/fomo/pump-age", 0.003, symbol=symbol, quote=quote)
+
+
+@paid(0.003, "Is `symbol` already extended? Distance from the 20 and 50 MA on 4h candles, Bollinger band "
+             "position and z-score, with a verdict. `quote` is USDC (USD and USDT accepted as aliases). "
+             f"{HL} {COV}")
+async def is_price_extended(symbol: str = "BTC", quote: str = "USDC") -> dict:
+    return await call("/v1/fomo/already-extended", 0.003, symbol=symbol, quote=quote)
+
+
+@paid(0.003, "Current green-candle streak of `symbol` on `interval` (1h, 4h, 1d) candles, its gain, the "
+             "average streak and how often the next candle was green after similar streaks (last 100 candles). "
+             f"`quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
+async def get_green_candle_streak(symbol: str = "BTC", interval: str = "4h", quote: str = "USDC") -> dict:
+    return await call("/v1/fomo/green-candles-streak", 0.003, symbol=symbol, interval=interval, quote=quote)
 
 
 # --- Trading context --------------------------------------------------------
