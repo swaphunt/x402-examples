@@ -1,0 +1,41 @@
+# Dependabot: weekly updates; minor and patch bumps are grouped into one PR per ecosystem.
+# open-pull-requests-limit applies per entry (Dependabot has no repo-wide limit).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directories:
+      - "/alert-bot"
+      - "/daily-brief"
+      - "/mcp-server"
+      - "/quickstart/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      pip-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "npm"
+    directory: "/quickstart/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
