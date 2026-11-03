@@ -168,10 +168,21 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
     receipt = r.headers.get("PAYMENT-RESPONSE")
     nc = _not_covered(r)
     if nc is not None and not receipt:
-        # Coverage changed between quote and call; the API rejects uncovered coins before payment.
-        async with _lock:
-            _spent -= price
-        return _not_covered_result(nc)
+        # Coverage changed between quote and call. Only give the reservation back when it is certain
+        # nothing was signed: the final request carried no payment header. If a payment was signed,
+        # the API still does not settle on errors, but keep it counted against the cap to be safe.
+        sent = getattr(r, "request", None)
+        signed = sent is not None and any(h in sent.headers for h in ("payment-signature", "x-payment"))
+        if not signed:
+            async with _lock:
+                _spent -= price
+            return _not_covered_result(nc)
+        result = _not_covered_result(nc)
+        result["charged"] = "unlikely"
+        result["message"] = (f"{nc.get('message', 'This coin is not covered.')} A payment was signed, but the API "
+                             "does not settle on errors. It stays counted against the session cap to be safe. "
+                             "Retry with one of the covered coins.")
+        return result
     tx = decode_payment_response_header(receipt).transaction if receipt else None
     tx_link = f"https://basescan.org/tx/{tx}" if tx else None
     if r.status_code != 200:
