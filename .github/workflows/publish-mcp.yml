@@ -1,5 +1,7 @@
-# Publishes mcp-server/ to PyPI as swaphunt-mcp when a tag like mcp-v0.1.0 is pushed.
-# Uses PyPI Trusted Publishing (OIDC): no PyPI token is stored anywhere.
+# Publishes mcp-server/ to PyPI as swaphunt-mcp, then to the official MCP registry as
+# io.github.swaphunt/swaphunt-mcp, when a tag like mcp-v0.1.0 is pushed.
+# Both use OIDC (PyPI Trusted Publishing and the registry's github-oidc login):
+# no PyPI token, GitHub token or PAT is stored anywhere.
 name: Publish swaphunt-mcp
 
 on:
@@ -32,3 +34,26 @@ jobs:
       - name: Smoke test the wheel
         run: uv tool run --isolated --from dist/swaphunt_mcp-*.whl swaphunt-mcp --version
       - run: uv publish --trusted-publishing always
+      - name: Install mcp-publisher (pinned, checksum verified)
+        working-directory: ${{ runner.temp }}
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.7
+          MCP_PUBLISHER_SHA256: 00b21004149a4ce66f0782508ae4a2bce67d1bea395a8da0bd8028159fb59579
+        run: |
+          curl -fsSL -o mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+      - name: Wait until PyPI serves this version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/swaphunt_mcp/__init__.py)
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null "https://pypi.org/pypi/swaphunt-mcp/${version}/json" && exit 0
+            sleep 10
+          done
+          echo "swaphunt-mcp ${version} not visible on PyPI after 5 minutes"; exit 1
+      - name: Publish to the MCP registry (OIDC, no token)
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
