@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 (2026-11-05)
+
+- Changed: depends on `x402[httpx,evm]` 2.26.0 (was 2.25.0); built with hatchling 1.33.0. No tool or behaviour changes.
+- Release: published to PyPI and the MCP registry from GitHub Actions (OIDC), no tokens.
+
 ## 0.4.0 (2026-11-03)
 
 First release on PyPI and the MCP registry since 0.1.0. Versions 0.2.0 and 0.3.0 were never published; their changes are merged into this release.
