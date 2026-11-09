@@ -59,7 +59,17 @@ The official x402 client libraries ([Python](https://pypi.org/project/x402/), [T
 - **Use a dedicated wallet with a few dollars of USDC on Base mainnet. Never your main wallet.** The facilitator pays the gas, so the wallet only needs USDC.
 - **Dry run by default.** Every example shows what it would pay and stops. It only pays with `--pay` or `X402_PAY=1`.
 - **Spending cap.** Every example refuses to spend more than `MAX_SPEND_USD` per run (default $0.10) and prints what the run cost.
+- **Pinned receiving address (MCP server).** `PAYTO_ALLOWLIST=0xD6b585DD2F48263D08FB75EA28c1598d845d23a8` makes the MCP server refuse, before signing, any 402 that asks for payment to another address. See [mcp-server](mcp-server/#pinning-the-receiving-address).
 - **Never commit keys.** Put `PRIVATE_KEY` and API keys in `.env` (ignored by git), using [.env.example](.env.example) as the template.
+
+## Tests
+
+The MCP server is tested against a local fake of the API, with no real money and no network:
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r tests/requirements.txt
+.venv/bin/python -m pytest tests
+```
 
 ## Links
 

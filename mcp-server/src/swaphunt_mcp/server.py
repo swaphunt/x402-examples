@@ -1,14 +1,19 @@
 """SwapHunt MCP server: SwapHunt's x402 endpoints as MCP tools, paid per call in USDC on Base.
 
 Dry run by default: tools report what a call would cost and return no data.
-Set X402_PAY=1 and PRIVATE_KEY (or PRIVATE_KEY_FILE) to pay. Spending is capped per session (server process) by MAX_SPEND_USD.
+Set X402_PAY=1 and PRIVATE_KEY_FILE (or PRIVATE_KEY) to pay. Spending is capped per session (server process) by
+MAX_SPEND_USD. PAYTO_ALLOWLIST limits which addresses the server may pay.
 
-Run:  uvx swaphunt-mcp            (stdio, for Claude Desktop / Claude Code)
+Run:  uvx swaphunt-mcp            (stdio, for Claude Code / Claude Desktop / Cursor / VS Code)
       uvx swaphunt-mcp --check    (compare advertised prices with the live API, pays nothing)
+      uvx swaphunt-mcp --version
 """
+import argparse
 import asyncio
 import os
+import re
 import sys
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -24,14 +29,36 @@ from x402.mechanisms.evm import EthAccountSigner
 from x402.mechanisms.evm.exact.register import register_exact_evm_client
 from x402.schemas.errors import NoMatchingRequirementsError
 
-BASE = "https://x402.swaphunt.dev"
+BASE = os.getenv("SWAPHUNT_API_URL", "https://x402.swaphunt.dev").rstrip("/")  # override only for tests
 ICON_URL = "https://raw.githubusercontent.com/swaphunt/x402-examples/main/mcp-server/assets/icon-512.png"
 MAX_SPEND = float(os.getenv("MAX_SPEND_USD") or "0.10")  # empty counts as unset
 PAY = os.getenv("X402_PAY") == "1"
-# The key can come from a file, so it never has to sit in an MCP client's config file.
-if not os.getenv("PRIVATE_KEY") and os.getenv("PRIVATE_KEY_FILE"):
-    with open(os.path.expanduser(os.environ["PRIVATE_KEY_FILE"])) as f:
-        os.environ["PRIVATE_KEY"] = f.read().strip()
+HEADERS = {"User-Agent": f"swaphunt-mcp/{__version__}"}  # so SwapHunt can tell this client's traffic apart
+
+
+def _load_private_key() -> str | None:
+    """PRIVATE_KEY, or PRIVATE_KEY_FILE so the key never has to sit in an MCP client's config file."""
+    key, path = os.getenv("PRIVATE_KEY"), os.getenv("PRIVATE_KEY_FILE")
+    if key and path:
+        sys.exit("Set PRIVATE_KEY or PRIVATE_KEY_FILE, not both.")
+    if path:
+        p = Path(path).expanduser()
+        if os.name == "posix" and p.stat().st_mode & 0o077:
+            sys.exit(f"{p} is readable by other users. Run: chmod 600 {p}")
+        key = p.read_text().strip()
+    return key or None
+
+
+def _payto_allowlist() -> set[str]:
+    """Optional PAYTO_ALLOWLIST: comma-separated addresses the server may pay. Empty = any payTo."""
+    entries = [a.strip() for a in (os.getenv("PAYTO_ALLOWLIST") or "").split(",") if a.strip()]
+    bad = [a for a in entries if not re.fullmatch(r"0x[0-9a-fA-F]{40}", a)]
+    if bad:
+        sys.exit(f"PAYTO_ALLOWLIST has an entry that is not an address: {bad[0]!r}")
+    return {a.lower() for a in entries}
+
+
+PAYTO_ALLOWLIST = _payto_allowlist()
 
 mcp = MCPServer(
     "swaphunt",
@@ -97,15 +124,15 @@ def _not_covered_result(body: dict) -> dict:
 
 async def _quote(path: str, params: dict) -> Any:
     """Unpaid request -> 402. Returns the USDC-on-Base option; any other asset or network is refused."""
-    async with httpx.AsyncClient(timeout=30) as http:
+    async with httpx.AsyncClient(timeout=30, headers=HEADERS) as http:
         r = await http.get(BASE + path, params=params)
     nc = _not_covered(r)
     if nc is not None:
         raise NotCovered(nc)
-    if r.status_code != 402:
-        raise RuntimeError(f"expected 402 from {path}, got {r.status_code}: {r.text[:200]}")
+    if r.status_code != 402 or "PAYMENT-REQUIRED" not in r.headers:
+        raise RuntimeError(f"expected 402 from {path}, got HTTP {r.status_code}: {r.text[:200]!r}")
     for req in decode_payment_required_header(r.headers["PAYMENT-REQUIRED"]).accepts:
-        if req.network == BASE_MAINNET and req.asset.lower() == USDC_ON_BASE:
+        if req.scheme == "exact" and req.network == BASE_MAINNET and req.asset.lower() == USDC_ON_BASE:
             return req
     raise RuntimeError(f"{path} offers no USDC payment on Base")
 
@@ -134,14 +161,19 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
         quote = await _quote(path, params)
     except NotCovered as e:
         return _not_covered_result(e.body)
+    except Exception as e:
+        return {"error": f"Not paid: {type(e).__name__}: {str(e)[:300]}"}
     price = _usd(quote)
-    if price > advertised:
+    # Both checks run before anything is signed, in dry run too, so a dry run shows what a paid call would do.
+    if price > advertised + 1e-9:
         return {"error": f"Refused: {path} now costs ${price:.3f}, more than the advertised ${advertised:.3f}."}
+    if PAYTO_ALLOWLIST and quote.pay_to.lower() not in PAYTO_ALLOWLIST:
+        return {"error": f"Refused: {path} asks for payment to {quote.pay_to}, which is not in PAYTO_ALLOWLIST."}
     if not PAY:
-        return {"dry_run": True, "would_cost_usd": price, "network": quote.network,
+        return {"dry_run": True, "would_cost_usd": price, "network": quote.network, "pay_to": quote.pay_to,
                 "note": "Dry run, nothing paid and no data. The user can set X402_PAY=1 to enable payments."}
     async with _lock:
-        if _spent + price > MAX_SPEND:
+        if _spent + price > MAX_SPEND + 1e-9:
             return {"error": f"Session spending cap reached: ${_spent:.3f} spent of MAX_SPEND_USD=${MAX_SPEND:g}; "
                              f"this call costs ${price:.3f}. Restart the server or raise MAX_SPEND_USD."}
         _spent += price  # reserve before paying so parallel calls can't overshoot
@@ -150,13 +182,13 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
     try:
         client = x402Client().set_spend_controls({"max_amount_per_payment": f"${price:.6f}"})
         client.register_policy(_locked_to(quote))
-        register_exact_evm_client(client, EthAccountSigner(Account.from_key(os.environ["PRIVATE_KEY"])))
+        register_exact_evm_client(client, EthAccountSigner(Account.from_key(_load_private_key())))
     except Exception as e:
         async with _lock:
             _spent -= price
         return {"error": f"Not paid (wallet setup failed): {type(e).__name__}"}
     try:
-        async with x402HttpxClient(client, timeout=60) as http:
+        async with x402HttpxClient(client, timeout=60, headers=HEADERS) as http:
             r = await http.get(BASE + path, params=params)
     except Exception as e:
         if _refused_before_signing(e):
@@ -427,16 +459,19 @@ async def get_weekend_liquidity() -> dict:
 
 # --- Maintainer check -------------------------------------------------------
 
+# Parameters for --check where the endpoint's defaults are not enough (required parameters).
+CHECK_PARAMS = {"/v1/sanity/is-this-a-breakout": {"symbol": "BTC", "level": 100000},
+                "/v1/sanity/is-this-support": {"symbol": "BTC", "level": 50000}}
+
+
 async def check_prices() -> None:
     """Compare every tool's advertised price with the live 402. Pays nothing."""
-    import re
-
-    src = open(__file__).read()
+    src = Path(__file__).read_text()
     pairs = re.findall(r'await call\("([^"]+)", ([0-9.]+)', src)
     bad = 0
     for path, adv in pairs:
         try:
-            live = _usd(await _quote(path, {}))
+            live = _usd(await _quote(path, CHECK_PARAMS.get(path, {})))
         except Exception as e:
             bad += 1
             print(f"ERR {path:<36} {str(e)[:60]}")
@@ -450,14 +485,22 @@ async def check_prices() -> None:
 
 def main() -> None:
     """Entry point for `swaphunt-mcp` (and `uvx swaphunt-mcp`)."""
-    if "--version" in sys.argv:
-        print(f"swaphunt-mcp {__version__}")
-    elif "--check" in sys.argv:
+    parser = argparse.ArgumentParser(
+        prog="swaphunt-mcp",
+        description="SwapHunt crypto market context as MCP tools, paid per call with x402 (USDC on Base). "
+                    "Without arguments it runs the MCP server on stdio. Dry run unless X402_PAY=1.",
+        epilog="Settings (environment): X402_PAY, PRIVATE_KEY_FILE or PRIVATE_KEY, MAX_SPEND_USD (default 0.10), "
+               "PAYTO_ALLOWLIST. See https://github.com/swaphunt/x402-examples/tree/main/mcp-server",
+    )
+    parser.add_argument("--version", action="version", version=f"swaphunt-mcp {__version__}")
+    parser.add_argument("--check", action="store_true",
+                        help="compare every tool's advertised price with the live 402 response; pays nothing")
+    args = parser.parse_args()
+    if args.check:
         asyncio.run(check_prices())
-    else:
-        if PAY and not os.getenv("PRIVATE_KEY"):
-            sys.exit("X402_PAY=1 needs PRIVATE_KEY or PRIVATE_KEY_FILE (a dedicated wallet with a few dollars of USDC on Base).")
-        mcp.run()  # stdio
+    if PAY and not _load_private_key():
+        sys.exit("X402_PAY=1 needs PRIVATE_KEY or PRIVATE_KEY_FILE (a dedicated wallet with a few dollars of USDC on Base).")
+    mcp.run()  # stdio
 
 
 if __name__ == "__main__":

@@ -92,8 +92,27 @@ The server runs with [uv](https://docs.astral.sh/uv/)'s `uvx`, which downloads i
 | `PRIVATE_KEY_FILE` | | Path to a file with the wallet's private key (recommended). |
 | `PRIVATE_KEY` | | The key itself, if you prefer an environment variable. |
 | `MAX_SPEND_USD` | `0.10` | Spending cap for the session (one server process). Calls beyond it are refused, not paid. |
+| `PAYTO_ALLOWLIST` | empty | Optional comma-separated addresses the server may pay. A 402 asking for payment to any other address is refused before anything is signed, in dry run too. Empty means any `payTo` the API quotes. |
 
-Each payment is also locked to the price, asset (USDC), network (Base) and `payTo` address the API quoted for that call, and a tool refuses to pay more than the price in its description. If a call fails after the payment was sent, it still counts against the cap and is reported as "possibly paid".
+### Pinning the receiving address
+
+SwapHunt receives payments on Base at `0xD6b585DD2F48263D08FB75EA28c1598d845d23a8`. To make the server refuse any other address, even if a response were tampered with, set:
+
+```bash
+PAYTO_ALLOWLIST=0xD6b585DD2F48263D08FB75EA28c1598d845d23a8
+```
+
+Check the address on [swaphunt.dev/agents](https://swaphunt.dev/agents) before you pin it. If SwapHunt ever changes its receiving address, pinned calls are refused (nothing is paid) until you update the list.
+
+## Security
+
+- **Dry run by default.** Without `X402_PAY=1` nothing is signed and no data is returned; a dry run still shows the price and the `payTo` address.
+- **Price ceiling per tool.** Each tool has its price in its description and refuses to pay more, before signing.
+- **Spending cap.** `MAX_SPEND_USD` limits what one server process can spend. Money is reserved before paying, so parallel calls cannot overshoot.
+- **Locked payment.** Each payment is locked to the amount, asset (USDC), network (Base, `eip155:8453`) and `payTo` address of the 402 the server just received for that call. If the second 402 asks for anything else, nothing is signed. With `PAYTO_ALLOWLIST`, a `payTo` outside the list is refused before signing.
+- **Failed calls stay counted.** If a call fails after a payment may have been signed, it counts against the cap and is reported as "possibly paid".
+- **Key file.** `PRIVATE_KEY_FILE` must not be readable by other users (`chmod 600`); the server refuses to start otherwise.
+- **Identifies itself.** Requests carry `User-Agent: swaphunt-mcp/<version>`.
 
 ## Claude Code
 
@@ -137,6 +156,16 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
 
 If Claude Desktop can't find `uvx`, use its full path (`which uvx` on macOS/Linux, `where uvx` on Windows).
 
+## Cursor, Windsurf (Devin Desktop) and VS Code
+
+The same `command`, `args` and `env` work in any MCP client that runs stdio servers:
+
+- **Cursor:** `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project), under `mcpServers`, as for Claude Desktop.
+- **Windsurf (Devin Desktop):** `~/.codeium/windsurf/mcp_config.json`, under `mcpServers`.
+- **VS Code:** `.vscode/mcp.json`, under `servers`, with `"type": "stdio"`.
+
+Step-by-step setup for each client: [swaphunt.dev/agents](https://swaphunt.dev/agents).
+
 ## What a tool call returns
 
 Paid:
@@ -155,6 +184,7 @@ Dry run (no `X402_PAY=1`):
 
 ```json
 {"dry_run": true, "would_cost_usd": 0.001, "network": "eip155:8453",
+ "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
  "note": "Dry run, nothing paid and no data. The user can set X402_PAY=1 to enable payments."}
 ```
 
@@ -175,6 +205,8 @@ uv run swaphunt-mcp            # or: uv run swaphunt-mcp --check
 ## For maintainers
 
 `uvx swaphunt-mcp --check` compares every tool's advertised price with the live API. It pays nothing.
+
+Tests run against a local fake of the API (`tests/fake_swaphunt.py`), with no real money and no network: `python -m pytest tests` from the repository root. `tests/contract.json` holds one entry per paid endpoint (tool, path, price, required parameters); the tests check every tool against it.
 
 Source, issues and the other x402 examples (quickstart, daily brief, alert bot): [github.com/swaphunt/x402-examples](https://github.com/swaphunt/x402-examples).
 

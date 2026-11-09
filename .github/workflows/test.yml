@@ -1,0 +1,28 @@
+# Runs the MCP server tests against the local fake API (tests/fake_swaphunt.py). No network to
+# SwapHunt, no real money, no secrets. Publishes nothing.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r tests/requirements.txt
+      - run: python -m pytest tests -q
