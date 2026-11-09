@@ -1,0 +1,219 @@
+{
+ "source": "https://swaphunt.dev/api (data/api_catalog.json in swaphunt-dev-web, synced from the API's pricing.py), 2026-11-03",
+ "endpoints": [
+  {
+   "tool": "get_price",
+   "method": "GET",
+   "path": "/v1/tools/price",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "get_prices",
+   "method": "GET",
+   "path": "/v1/tools/price/multi",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_supported_assets",
+   "method": "GET",
+   "path": "/v1/tools/price/supported",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "get_alt_season",
+   "method": "GET",
+   "path": "/v1/market/alt-season",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_coin_strength",
+   "method": "GET",
+   "path": "/v1/market/coin-strength",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_correlation",
+   "method": "GET",
+   "path": "/v1/market/correlation",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_fear_greed",
+   "method": "GET",
+   "path": "/v1/market/fear-greed",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "get_fear_greed_compare",
+   "method": "GET",
+   "path": "/v1/market/fear-greed/compare",
+   "price_atomic": 2000,
+   "required": []
+  },
+  {
+   "tool": "get_fear_greed_history",
+   "method": "GET",
+   "path": "/v1/market/fear-greed/history",
+   "price_atomic": 5000,
+   "required": []
+  },
+  {
+   "tool": "get_halving",
+   "method": "GET",
+   "path": "/v1/market/halving",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "get_momentum_rank",
+   "method": "GET",
+   "path": "/v1/market/momentum-rank",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_funding_rates",
+   "method": "GET",
+   "path": "/v1/derivatives/funding-rates",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_funding_history",
+   "method": "GET",
+   "path": "/v1/derivatives/funding-rates/history",
+   "price_atomic": 4000,
+   "required": []
+  },
+  {
+   "tool": "get_top_funding_rates",
+   "method": "GET",
+   "path": "/v1/derivatives/funding-rates/top",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_compression_alert",
+   "method": "GET",
+   "path": "/v1/vol/compression-alert",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_expected_move",
+   "method": "GET",
+   "path": "/v1/vol/expected-move",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_volatility",
+   "method": "GET",
+   "path": "/v1/vol/realized",
+   "price_atomic": 2000,
+   "required": []
+  },
+  {
+   "tool": "get_market_silence",
+   "method": "GET",
+   "path": "/v1/vol/silence",
+   "price_atomic": 2000,
+   "required": []
+  },
+  {
+   "tool": "get_chop_detection",
+   "method": "GET",
+   "path": "/v1/regime/chop-detection",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_market_regime",
+   "method": "GET",
+   "path": "/v1/regime/current",
+   "price_atomic": 2000,
+   "required": []
+  },
+  {
+   "tool": "get_trading_session",
+   "method": "GET",
+   "path": "/v1/context/session",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "get_weekend_liquidity",
+   "method": "GET",
+   "path": "/v1/context/weekend-liquidity",
+   "price_atomic": 1000,
+   "required": []
+  },
+  {
+   "tool": "is_this_a_breakout",
+   "method": "GET",
+   "path": "/v1/sanity/is-this-a-breakout",
+   "price_atomic": 3000,
+   "required": [
+    "level"
+   ]
+  },
+  {
+   "tool": "is_this_a_dip",
+   "method": "GET",
+   "path": "/v1/sanity/is-this-a-dip",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "is_this_oversold",
+   "method": "GET",
+   "path": "/v1/sanity/is-this-oversold",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "is_this_support",
+   "method": "GET",
+   "path": "/v1/sanity/is-this-support",
+   "price_atomic": 3000,
+   "required": [
+    "level"
+   ]
+  },
+  {
+   "tool": "is_price_extended",
+   "method": "GET",
+   "path": "/v1/fomo/already-extended",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_green_candle_streak",
+   "method": "GET",
+   "path": "/v1/fomo/green-candles-streak",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "how_late_am_i",
+   "method": "GET",
+   "path": "/v1/fomo/how-late-am-i",
+   "price_atomic": 3000,
+   "required": []
+  },
+  {
+   "tool": "get_pump_age",
+   "method": "GET",
+   "path": "/v1/fomo/pump-age",
+   "price_atomic": 3000,
+   "required": []
+  }
+ ]
+}

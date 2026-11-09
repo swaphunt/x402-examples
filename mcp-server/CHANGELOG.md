@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+- Added: `PAYTO_ALLOWLIST`, optional comma-separated addresses the server may pay. A 402 asking for any other `payTo` is refused before anything is signed, in dry run too. Invalid entries stop the server at startup.
+- Added: requests identify themselves with `User-Agent: swaphunt-mcp/<version>`.
+- Added: dry-run results include `pay_to`.
+- Added: tests against a local fake API (`tests/`): a contract per tool (path, price, required parameters, price in the description), dry run, price ceiling per tool, session cap, payment lock, allowlist, uncovered coins and key handling.
+- Changed: `PRIVATE_KEY_FILE` must not be readable by other users (chmod 600), and setting both `PRIVATE_KEY` and `PRIVATE_KEY_FILE` is refused. The key is read when a payment is made, not copied into the environment at import.
+- Changed: `--help` lists the settings; `--check` passes the required `level` to the breakout and support endpoints.
+- Changed: an unreachable API or a malformed 402 now returns `Not paid: ...` instead of a tool error.
+
 ## 0.4.1 (2026-11-05)
 
 - Changed: depends on `x402[httpx,evm]` 2.26.0 (was 2.25.0); built with hatchling 1.33.0. No tool or behaviour changes.
