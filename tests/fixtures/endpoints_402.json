@@ -1,0 +1,490 @@
+{
+ "captured_at": "2026-11-09",
+ "base_url": "https://x402.swaphunt.dev",
+ "endpoints": [
+  {
+   "path": "/v1/market/fear-greed",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/market/fear-greed/compare",
+   "amount": "2000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/market/fear-greed/history",
+   "amount": "5000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "days": {
+     "type": "integer",
+     "required": false,
+     "default": 30
+    },
+    "start_date": {
+     "type": "string",
+     "required": false
+    },
+    "end_date": {
+     "type": "string",
+     "required": false
+    }
+   }
+  },
+  {
+   "path": "/v1/market/halving",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "coin": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    }
+   }
+  },
+  {
+   "path": "/v1/tools/price",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "currency": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    },
+    "price_type": {
+     "type": "string",
+     "required": false,
+     "default": "mark"
+    }
+   }
+  },
+  {
+   "path": "/v1/tools/price/multi",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "assets": {
+     "type": "string",
+     "required": false,
+     "default": "BTC,ETH"
+    },
+    "currency": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    },
+    "price_type": {
+     "type": "string",
+     "required": false,
+     "default": "mark"
+    }
+   }
+  },
+  {
+   "path": "/v1/tools/price/supported",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/regime/current",
+   "amount": "2000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/regime/chop-detection",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "timeframe": {
+     "type": "string",
+     "required": false,
+     "default": "4h"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/vol/realized",
+   "amount": "2000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "period": {
+     "type": "string",
+     "required": false,
+     "default": "7d"
+    }
+   }
+  },
+  {
+   "path": "/v1/vol/silence",
+   "amount": "2000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "lookback": {
+     "type": "string",
+     "required": false,
+     "default": "7d"
+    }
+   }
+  },
+  {
+   "path": "/v1/vol/compression-alert",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "timeframe": {
+     "type": "string",
+     "required": false,
+     "default": "4h"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/vol/expected-move",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "asset": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "period": {
+     "type": "string",
+     "required": false,
+     "default": "1d"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/derivatives/funding-rates",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbols": {
+     "type": "string",
+     "required": false,
+     "default": "BTC,ETH,SOL"
+    }
+   }
+  },
+  {
+   "path": "/v1/derivatives/funding-rates/top",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "limit": {
+     "type": "integer",
+     "required": false,
+     "default": 10
+    },
+    "sort": {
+     "type": "string",
+     "required": false,
+     "default": "highest"
+    }
+   }
+  },
+  {
+   "path": "/v1/derivatives/funding-rates/history",
+   "amount": "4000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "days": {
+     "type": "integer",
+     "required": false,
+     "default": 90
+    }
+   }
+  },
+  {
+   "path": "/v1/market/alt-season",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/market/coin-strength",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "coin": {
+     "type": "string",
+     "required": false,
+     "default": "ETH"
+    },
+    "period": {
+     "type": "string",
+     "required": false,
+     "default": "24h"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/market/momentum-rank",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "period": {
+     "type": "string",
+     "required": false,
+     "default": "24h"
+    },
+    "limit": {
+     "type": "integer",
+     "required": false,
+     "default": 10
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/market/correlation",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "coin": {
+     "type": "string",
+     "required": false,
+     "default": "ETH"
+    },
+    "period": {
+     "type": "string",
+     "required": false,
+     "default": "7d"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/sanity/is-this-a-dip",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/sanity/is-this-a-breakout",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "level": {
+     "type": "number",
+     "required": true
+    },
+    "direction": {
+     "type": "string",
+     "required": false,
+     "default": "up"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/sanity/is-this-support",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "level": {
+     "type": "number",
+     "required": true
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/sanity/is-this-oversold",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/fomo/how-late-am-i",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/fomo/pump-age",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/fomo/already-extended",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/fomo/green-candles-streak",
+   "amount": "3000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {
+    "symbol": {
+     "type": "string",
+     "required": false,
+     "default": "BTC"
+    },
+    "interval": {
+     "type": "string",
+     "required": false,
+     "default": "4h"
+    },
+    "quote": {
+     "type": "string",
+     "required": false,
+     "default": "USDC"
+    }
+   }
+  },
+  {
+   "path": "/v1/context/session",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  },
+  {
+   "path": "/v1/context/weekend-liquidity",
+   "amount": "1000",
+   "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
+   "params": {}
+  }
+ ]
+}

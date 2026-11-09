@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 (2026-11-09)
+
+- Added: `PAYTO_ALLOWLIST`, a comma-separated list of addresses the server may pay. A quote to any other `payTo` is refused before anything is signed, in dry runs too. A malformed entry stops the server at start. Without it, any `payTo` can be paid (still capped by `MAX_SPEND_USD`), and the server says so on stderr when payments are on.
+- Added: dry-run results include `pay_to`, the address the call would pay, so you can fill in `PAYTO_ALLOWLIST` from a dry run.
+- Added: every request sends `User-Agent: swaphunt-mcp/<version>`.
+- Changed: the price check (a tool refuses to pay more than the price in its description) and the session cap compare with a small tolerance, and a failed quote (network error, no 402) returns `Not paid: ...` instead of raising.
+- Added: tests against a local fake API (`tests/`): a contract test of every tool against a snapshot of the live 402 responses (route, price, parameters, defaults), dry run, session cap, price check, payment lock, `PAYTO_ALLOWLIST`, `not_covered` and `--check`. `scripts/snapshot_402.py` refreshes the snapshot and pays nothing.
+- `SWAPHUNT_API_URL` points the server at another base URL. It exists for the tests; leave it unset.
+
 ## 0.4.1 (2026-11-05)
 
 - Changed: depends on `x402[httpx,evm]` 2.26.0 (was 2.25.0); built with hatchling 1.33.0. No tool or behaviour changes.
