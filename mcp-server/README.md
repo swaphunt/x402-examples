@@ -92,8 +92,11 @@ The server runs with [uv](https://docs.astral.sh/uv/)'s `uvx`, which downloads i
 | `PRIVATE_KEY_FILE` | | Path to a file with the wallet's private key (recommended). |
 | `PRIVATE_KEY` | | The key itself, if you prefer an environment variable. |
 | `MAX_SPEND_USD` | `0.10` | Spending cap for the session (one server process). Calls beyond it are refused, not paid. |
+| `PAYTO_ALLOWLIST` | any | Comma-separated addresses the server may pay. A quote to any other `payTo` is refused before anything is signed. |
 
 Each payment is also locked to the price, asset (USDC), network (Base) and `payTo` address the API quoted for that call, and a tool refuses to pay more than the price in its description. If a call fails after the payment was sent, it still counts against the cap and is reported as "possibly paid".
+
+`PAYTO_ALLOWLIST` adds a check you control: the server pays only addresses on your list. A dry run shows the address a call would pay (`pay_to`), so you can copy it from there. On 2026-11-09 SwapHunt's 402 responses on Base asked for payment to `0xD6b585DD2F48263D08FB75EA28c1598d845d23a8`. If SwapHunt ever changes its address, calls are refused until you update the list, which is the point.
 
 ## Claude Code
 
@@ -102,8 +105,11 @@ claude mcp add swaphunt \
   --env X402_PAY=1 \
   --env PRIVATE_KEY_FILE=$HOME/.swaphunt-wallet.key \
   --env MAX_SPEND_USD=0.25 \
+  --env PAYTO_ALLOWLIST=0xD6b585DD2F48263D08FB75EA28c1598d845d23a8 \
   -- uvx swaphunt-mcp
 ```
+
+Without the `--env` lines it runs as a dry run: `claude mcp add swaphunt -- uvx swaphunt-mcp`.
 
 Then ask, for example:
 
@@ -128,7 +134,8 @@ Add this to `claude_desktop_config.json` (Settings → Developer → Edit Config
       "env": {
         "X402_PAY": "1",
         "PRIVATE_KEY_FILE": "/home/you/.swaphunt-wallet.key",
-        "MAX_SPEND_USD": "0.25"
+        "MAX_SPEND_USD": "0.25",
+        "PAYTO_ALLOWLIST": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8"
       }
     }
   }
@@ -155,7 +162,14 @@ Dry run (no `X402_PAY=1`):
 
 ```json
 {"dry_run": true, "would_cost_usd": 0.001, "network": "eip155:8453",
+ "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
  "note": "Dry run, nothing paid and no data. The user can set X402_PAY=1 to enable payments."}
+```
+
+When the quote asks for an address that is not in `PAYTO_ALLOWLIST` (nothing is signed):
+
+```json
+{"error": "Refused: /v1/market/fear-greed asks for payment to 0x..., which is not in PAYTO_ALLOWLIST. Nothing was signed or paid."}
 ```
 
 When the cap is reached:
@@ -175,6 +189,15 @@ uv run swaphunt-mcp            # or: uv run swaphunt-mcp --check
 ## For maintainers
 
 `uvx swaphunt-mcp --check` compares every tool's advertised price with the live API. It pays nothing.
+
+Tests run against a local fake API, with no money involved:
+
+```bash
+pip install -r tests/requirements.txt
+python -m pytest tests -q
+```
+
+`python3 scripts/snapshot_402.py` refreshes `tests/fixtures/endpoints_402.json` from the live 402 responses (unpaid requests only); the contract test then checks every tool's route, price, parameters and defaults against it.
 
 Source, issues and the other x402 examples (quickstart, daily brief, alert bot): [github.com/swaphunt/x402-examples](https://github.com/swaphunt/x402-examples).
 
