@@ -10,12 +10,12 @@ These examples get you from zero to a paid call in a few minutes, and show how t
 
 | Example | Language | What it does | Cost per run |
 |---|---|---|---|
-| [quickstart](quickstart/) | Python, TypeScript | One paid call to `/v1/market/fear-greed` | $0.001 |
-| [daily-brief](daily-brief/) | Python | Fear & Greed with its 1, 7 and 30-day changes, halving countdown, trading session and weekend liquidity, summarized by an LLM and delivered to stdout, Telegram, Discord or email | $0.005 + LLM tokens |
-| [mcp-server](mcp-server/) | Python (`uvx swaphunt-mcp`) | 30 SwapHunt tools (Hyperliquid prices, regime, volatility, funding, coin strength, dip/breakout/FOMO checks; Fear & Greed) for Claude and other AI agents, paid per call with a session cap | $0.001-0.005 per tool call |
-| [alert-bot](alert-bot/) | Python | Checks one price on an interval and messages you on Telegram when it crosses a threshold | $0.001 per check |
+| [quickstart](quickstart/) | Python, TypeScript | One paid call to `/v1/market/fear-greed` | $0.005 |
+| [daily-brief](daily-brief/) | Python | Fear & Greed with its 1, 7 and 30-day changes, halving countdown, trading session and weekend liquidity, summarized by an LLM and delivered to stdout, Telegram, Discord or email | $0.013 + LLM tokens |
+| [mcp-server](mcp-server/) | Python (`uvx swaphunt-mcp`) | 30 SwapHunt tools (Hyperliquid prices, regime, volatility, funding, coin strength, dip/breakout/FOMO checks; Fear & Greed) for Claude and other AI agents, paid per call with a session cap | $0.001-0.015 per tool call |
+| [alert-bot](alert-bot/) | Python | Checks one price on an interval and messages you on Telegram when it crosses a threshold | $0.005 per check |
 
-The API has 30 paid endpoints, from $0.001 to $0.005 per call; the live list with parameters is in the [OpenAPI docs](https://x402.swaphunt.dev/docs). Prices, parameters and example responses for the core endpoints: [docs/endpoints.md](docs/endpoints.md).
+The API has 30 paid endpoints, from $0.001 to $0.015 per call; the live list with parameters is in the [OpenAPI docs](https://x402.swaphunt.dev/docs). Prices, parameters and example responses for the core endpoints: [docs/endpoints.md](docs/endpoints.md).
 
 Fear & Greed data comes from Alternative.me, which asks for attribution next to its data. The responses include an `attribution` field with the text to show.
 
@@ -33,15 +33,15 @@ python3 -m venv .venv
 
 cp ../../.env.example ../../.env        # put your PRIVATE_KEY in ../../.env
 set -a; . ../../.env; set +a
-.venv/bin/python quickstart.py --pay    # pays $0.001
+.venv/bin/python quickstart.py --pay    # pays $0.005
 ```
 
 Output of the paid call:
 
 ```
-Price: $0.001 USDC on eip155:8453, payTo 0x<swaphunt-address>
+Price: $0.005 USDC on eip155:8453, payTo 0x<swaphunt-address>
 200 {'value': 30, 'label': 'Fear', 'timestamp': '2026-10-31T00:00:00', 'source': 'alternative.me', ...}
-This run cost $0.001 (tx https://basescan.org/tx/0x<transaction-hash>)
+This run cost $0.005 (tx https://basescan.org/tx/0x<transaction-hash>)
 ```
 
 The TypeScript version and a 10-line minimal snippet are in [quickstart/](quickstart/).

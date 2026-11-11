@@ -4,14 +4,21 @@ Dry run by default: tools report what a call would cost and return no data.
 Set X402_PAY=1 and PRIVATE_KEY (or PRIVATE_KEY_FILE) to pay. Spending is capped per session (server process) by MAX_SPEND_USD.
 PAYTO_ALLOWLIST (optional) limits which addresses the server may pay; anything else is refused before signing.
 
+Prices: the price a call may cost is read from the API's own price list, /.well-known/x402 on the same
+host (cached for an hour), so a price change needs no new release. A 402 that asks for more than that list
+says is refused. If the list cannot be fetched, the prices built into this release are used instead.
+
 Run:  uvx swaphunt-mcp            (stdio, for Claude Desktop / Claude Code)
       uvx swaphunt-mcp --check    (compare advertised prices with the live API, pays nothing)
 """
 import asyncio
+import math
 import os
 import re
 import sys
+import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from eth_account import Account
@@ -82,6 +89,67 @@ def _usd(req) -> float:
     return int(req.amount) / 1e6  # only valid for USDC, which _quote enforces
 
 
+# --- Advertised prices from the API's price list -----------------------------------
+# /.well-known/x402 lists every paid route with its accepted payments. Its USDC-on-Base amount is the
+# "advertised" price a 402 may not exceed. The list is fetched on the first paid call and again after
+# PRICE_LIST_TTL seconds. If it cannot be fetched (or a route is missing from it), the price built into
+# this release is the limit; a list that was fetched before stays in use until a fetch succeeds again.
+
+PRICE_LIST_URL = BASE + "/.well-known/x402"
+PRICE_LIST_TTL = 3600.0
+_price_list: dict[str, float] = {}
+_price_list_at: float | None = None  # monotonic time of the last fetch attempt
+_price_lock = asyncio.Lock()
+
+
+def _parse_price_list(doc: Any) -> dict[str, float]:
+    """{path: USD} from a /.well-known/x402 document; only GET routes with a USDC-on-Base amount."""
+    out: dict[str, float] = {}
+    for res in (doc or {}).get("resources") or []:
+        if not isinstance(res, dict) or str(res.get("method", "GET")).upper() != "GET":
+            continue
+        path = urlsplit(str(res.get("url", ""))).path
+        for acc in res.get("accepts") or []:
+            if (isinstance(acc, dict) and acc.get("network") == BASE_MAINNET
+                    and str(acc.get("asset", "")).lower() == USDC_ON_BASE):
+                try:
+                    usd = int(acc["amount"]) / 1e6
+                except (KeyError, TypeError, ValueError):
+                    break
+                if path.startswith("/v1/") and math.isfinite(usd) and usd > 0:
+                    out[path] = usd
+                break
+    return out
+
+
+async def _refresh_price_list() -> None:
+    global _price_list, _price_list_at
+    async with _price_lock:
+        now = time.monotonic()
+        if _price_list_at is not None and now - _price_list_at < PRICE_LIST_TTL:
+            return
+        _price_list_at = now
+        try:
+            async with httpx.AsyncClient(timeout=10, headers=HEADERS) as http:
+                r = await http.get(PRICE_LIST_URL)
+            r.raise_for_status()
+            fresh = _parse_price_list(r.json())
+        except Exception as e:
+            print(f"swaphunt-mcp: price list unavailable ({type(e).__name__}); using "
+                  f"{'the last fetched list' if _price_list else 'built-in prices'}", file=sys.stderr)
+            return
+        if fresh:
+            _price_list = fresh
+
+
+async def advertised_price(path: str, built_in: float) -> tuple[float, str]:
+    """The most a call to `path` may cost, and where that limit comes from."""
+    await _refresh_price_list()
+    if path in _price_list:
+        return _price_list[path], "the API's price list"
+    return built_in, "the price built into this release"
+
+
 class NotCovered(Exception):
     """The API rejected the coin before asking for payment (HTTP 422 not_covered). Nothing is charged."""
 
@@ -142,7 +210,10 @@ def _refused_before_signing(e: BaseException) -> bool:
 
 
 async def call(path: str, advertised: float, **params: Any) -> dict:
-    """Quote, check price and budget, pay, return the data plus what it cost."""
+    """Quote, check price and budget, pay, return the data plus what it cost.
+
+    `advertised` is the built-in fallback; the limit normally comes from the API's price list.
+    """
     global _spent, _calls
     params = {k: v for k, v in params.items() if v is not None}
     try:
@@ -152,9 +223,14 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
     except Exception as e:
         return {"error": f"Not paid: {type(e).__name__}: {str(e)[:300]}"}
     price = _usd(quote)
-    # Both checks run before anything is signed, in dry runs too, so a dry run shows what would be refused.
-    if price > advertised + 1e-9:
-        return {"error": f"Refused: {path} now costs ${price:.3f}, more than the advertised ${advertised:.3f}."}
+    limit, source = await advertised_price(path, advertised)
+    # These checks run before anything is signed, in dry runs too, so a dry run shows what would be refused.
+    if price > limit + 1e-9:
+        return {"error": f"Refused: {path} now costs ${price:.3f}, more than the advertised ${limit:.3f} "
+                         f"({source}). Nothing was signed or paid."}
+    if price > MAX_SPEND + 1e-9:
+        return {"error": f"Refused: {path} costs ${price:.3f}, more than MAX_SPEND_USD=${MAX_SPEND:g}. "
+                         "Nothing was signed or paid."}
     if PAYTO_ALLOWLIST and quote.pay_to.lower() not in PAYTO_ALLOWLIST:
         return {"error": f"Refused: {path} asks for payment to {quote.pay_to}, which is not in PAYTO_ALLOWLIST. "
                          "Nothing was signed or paid."}
@@ -215,7 +291,7 @@ async def call(path: str, advertised: float, **params: Any) -> dict:
 
 
 def paid(price: float, summary: str):
-    """Register a paid tool; the price goes into the description the agent sees."""
+    """Register a paid tool; the built-in price goes into the description the agent sees."""
     return mcp.tool(description=f"{summary} Costs ${price:.3f} USDC per call.")
 
 
@@ -230,10 +306,10 @@ async def get_spending() -> dict:
 # --- Fear & Greed -----------------------------------------------------------
 # Alternative.me asks for attribution next to its data: show the `attribution` field with the values.
 
-@paid(0.001, "Crypto Fear & Greed Index (0-100) with its label, updated daily. "
+@paid(0.005, "Crypto Fear & Greed Index (0-100) with its label, updated daily. "
              "When showing the value, include the `attribution` text from the result.")
 async def get_fear_greed() -> dict:
-    return await call("/v1/market/fear-greed", 0.001)
+    return await call("/v1/market/fear-greed", 0.005)
 
 
 @paid(0.002, "Fear & Greed Index now vs yesterday, 7 and 30 days ago, with the changes. "
@@ -262,11 +338,11 @@ async def get_halving(coin: str = "BTC") -> dict:
 HL = "From Hyperliquid perpetuals (USDC-margined)."
 
 
-@paid(0.001, "Live price of one asset in USDC: perp mark price (`price_type` mark) or order-book mid "
+@paid(0.005, "Live price of one asset in USDC: perp mark price (`price_type` mark) or order-book mid "
              "(`price_type` mid), with 24h change and 24h volume. `asset` is any active perp (BTC, ETH, SOL ...; "
              f"BTCUSDT and BTC-PERP also mean BTC). `currency` is USDC (USD and USDT accepted as aliases). {HL}")
 async def get_price(asset: str = "BTC", currency: str = "USDC", price_type: str = "mark") -> dict:
-    return await call("/v1/tools/price", 0.001, asset=asset, currency=currency, price_type=price_type)
+    return await call("/v1/tools/price", 0.005, asset=asset, currency=currency, price_type=price_type)
 
 
 @paid(0.003, "Prices in USDC for up to 20 assets in one call (`assets` comma-separated, e.g. 'BTC,ETH,SOL'), "
@@ -282,10 +358,10 @@ async def get_supported_assets() -> dict:
     return await call("/v1/tools/price/supported", 0.001)
 
 
-@paid(0.002, "Current BTC market regime (BULLISH/BEARISH/NEUTRAL): BTC perp price vs its 20-period EMA on 12h "
+@paid(0.010, "Current BTC market regime (BULLISH/BEARISH/NEUTRAL): BTC perp price vs its 20-period EMA on 12h "
              f"candles, with EMA value and slope. Updates at 00:00 and 12:00 UTC. {HL}")
 async def get_market_regime() -> dict:
-    return await call("/v1/regime/current", 0.002)
+    return await call("/v1/regime/current", 0.010)
 
 
 @paid(0.003, "Is `asset` trending or chopping? ADX-based, with +DI/-DI and trend direction, on `timeframe` "
@@ -294,10 +370,10 @@ async def get_chop_detection(asset: str = "BTC", timeframe: str = "4h", quote: s
     return await call("/v1/regime/chop-detection", 0.003, asset=asset, timeframe=timeframe, quote=quote)
 
 
-@paid(0.002, "Realized volatility of `asset` over `period` (7d, 14d, 30d): daily and annualized %, a "
+@paid(0.010, "Realized volatility of `asset` over `period` (7d, 14d, 30d): daily and annualized %, a "
              f"low/normal/high/extreme level and today's UTC range. Backward-looking, not implied vol. {HL}")
 async def get_volatility(asset: str = "BTC", period: str = "7d") -> dict:
-    return await call("/v1/vol/realized", 0.002, asset=asset, period=period)
+    return await call("/v1/vol/realized", 0.010, asset=asset, period=period)
 
 
 @paid(0.002, "Market-silence score 0-1 for `asset` over `lookback` (7d, 14d, 30d): low volume, low volatility "
@@ -320,11 +396,11 @@ async def get_expected_move(asset: str = "BTC", period: str = "1d", quote: str =
     return await call("/v1/vol/expected-move", 0.003, asset=asset, period=period, quote=quote)
 
 
-@paid(0.003, "Current funding rates for up to 20 coins (`symbols` comma-separated, e.g. 'BTC,ETH,SOL'). Funding "
+@paid(0.015, "Current funding rates for up to 20 coins (`symbols` comma-separated, e.g. 'BTC,ETH,SOL'). Funding "
              "is hourly: funding_rate_pct is the hourly rate, annualized = hourly x 8760; with 7d/30d averages "
              f"and a crowding signal. Positive = longs pay shorts. {HL}")
 async def get_funding_rates(symbols: str = "BTC,ETH,SOL") -> dict:
-    return await call("/v1/derivatives/funding-rates", 0.003, symbols=symbols)
+    return await call("/v1/derivatives/funding-rates", 0.015, symbols=symbols)
 
 
 @paid(0.003, "Leaderboard of the `limit` (1-50) most extreme current funding rates across all active perps, "
@@ -355,18 +431,18 @@ COV = ("Covers the top 50 Hyperliquid perpetuals by 30-day volume (list in get_s
        "`covered`); other coins are rejected with not_covered and not charged.")
 
 
-@paid(0.003, "Strength of `coin` vs BTC: the coin's return minus BTC's over `period` (24h, 7d, 30d), rated "
+@paid(0.015, "Strength of `coin` vs BTC: the coin's return minus BTC's over `period` (24h, 7d, 30d), rated "
              "very_strong/strong/neutral/weak/very_weak. `quote` is USDC (USD and USDT accepted as aliases). "
              f"{HL} {COV}")
 async def get_coin_strength(coin: str = "ETH", period: str = "24h", quote: str = "USDC") -> dict:
-    return await call("/v1/market/coin-strength", 0.003, coin=coin, period=period, quote=quote)
+    return await call("/v1/market/coin-strength", 0.015, coin=coin, period=period, quote=quote)
 
 
-@paid(0.003, "Momentum leaderboard: covered coins ranked by return over `period` (24h, 7d, 30d), with the "
+@paid(0.015, "Momentum leaderboard: covered coins ranked by return over `period` (24h, 7d, 30d), with the "
              "`limit` (1-20) top and bottom performers and the full ranking. `quote` is USDC (USD and USDT "
              f"accepted as aliases). {HL} Ranks only the top 50 Hyperliquid perpetuals by 30-day volume.")
 async def get_momentum_rank(period: str = "24h", limit: int = 10, quote: str = "USDC") -> dict:
-    return await call("/v1/market/momentum-rank", 0.003, period=period, limit=limit, quote=quote)
+    return await call("/v1/market/momentum-rank", 0.015, period=period, limit=limit, quote=quote)
 
 
 @paid(0.003, "Pearson correlation (-1 to +1) of `coin`'s returns with BTC's over `period` (7d on 1h candles, "
@@ -436,14 +512,14 @@ async def get_green_candle_streak(symbol: str = "BTC", interval: str = "4h", quo
 
 # --- Trading context --------------------------------------------------------
 
-@paid(0.001, "Current trading session (Asia, London, New York, off-hours) and its typical volatility.")
+@paid(0.005, "Current trading session (Asia, London, New York, off-hours) and its typical volatility.")
 async def get_trading_session() -> dict:
-    return await call("/v1/context/session", 0.001)
+    return await call("/v1/context/session", 0.005)
 
 
-@paid(0.001, "Is it a weekend or low-liquidity window right now? Returns a 0-100 liquidity score and the session.")
+@paid(0.005, "Is it a weekend or low-liquidity window right now? Returns a 0-100 liquidity score and the session.")
 async def get_weekend_liquidity() -> dict:
-    return await call("/v1/context/weekend-liquidity", 0.001)
+    return await call("/v1/context/weekend-liquidity", 0.005)
 
 
 # --- Maintainer check -------------------------------------------------------

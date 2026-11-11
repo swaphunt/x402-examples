@@ -1,3 +1,3 @@
 """SwapHunt MCP server: crypto market context for AI agents, paid per call with x402."""
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

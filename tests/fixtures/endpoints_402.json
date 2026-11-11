@@ -4,7 +4,7 @@
  "endpoints": [
   {
    "path": "/v1/market/fear-greed",
-   "amount": "1000",
+   "amount": "5000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {}
   },
@@ -48,7 +48,7 @@
   },
   {
    "path": "/v1/tools/price",
-   "amount": "1000",
+   "amount": "5000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
     "asset": {
@@ -98,7 +98,7 @@
   },
   {
    "path": "/v1/regime/current",
-   "amount": "2000",
+   "amount": "10000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {}
   },
@@ -126,7 +126,7 @@
   },
   {
    "path": "/v1/vol/realized",
-   "amount": "2000",
+   "amount": "10000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
     "asset": {
@@ -204,7 +204,7 @@
   },
   {
    "path": "/v1/derivatives/funding-rates",
-   "amount": "3000",
+   "amount": "15000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
     "symbols": {
@@ -256,7 +256,7 @@
   },
   {
    "path": "/v1/market/coin-strength",
-   "amount": "3000",
+   "amount": "15000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
     "coin": {
@@ -278,7 +278,7 @@
   },
   {
    "path": "/v1/market/momentum-rank",
-   "amount": "3000",
+   "amount": "15000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
     "period": {
@@ -476,15 +476,16 @@
   },
   {
    "path": "/v1/context/session",
-   "amount": "1000",
+   "amount": "5000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {}
   },
   {
    "path": "/v1/context/weekend-liquidity",
-   "amount": "1000",
+   "amount": "5000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {}
   }
- ]
+ ],
+ "note": "Prices of the 9 test-group endpoints set to the 2026-11 price test before the API deploy; refresh with scripts/snapshot_402.py after it."
 }
