@@ -1,6 +1,6 @@
 # Quickstart: your first paid x402 call
 
-One call to SwapHunt's `/v1/market/fear-greed` endpoint for $0.001 in USDC on Base. No account and no API key: the payment is the credential.
+One call to SwapHunt's `/v1/market/fear-greed` endpoint for $0.005 in USDC on Base. No account and no API key: the payment is the credential.
 
 The paid call itself is only a few lines.
 
@@ -66,7 +66,7 @@ cd python
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python quickstart.py          # dry run
-.venv/bin/python quickstart.py --pay    # pays $0.001
+.venv/bin/python quickstart.py --pay    # pays $0.005
 ```
 
 ## TypeScript
@@ -77,7 +77,7 @@ Requires Node.js 22.18+ (runs `.ts` files directly, no build step).
 cd typescript
 npm install
 node quickstart.ts          # dry run
-node quickstart.ts --pay    # pays $0.001
+node quickstart.ts --pay    # pays $0.005
 ```
 
 ## Expected output
@@ -85,16 +85,16 @@ node quickstart.ts --pay    # pays $0.001
 Dry run (both languages):
 
 ```
-Price: $0.001 USDC on eip155:8453, payTo 0x<swaphunt-address>
+Price: $0.005 USDC on eip155:8453, payTo 0x<swaphunt-address>
 Dry run: nothing paid. Re-run with --pay to pay.
 ```
 
 Paid call (Python; TypeScript prints the same data as a JS object):
 
 ```
-Price: $0.001 USDC on eip155:8453, payTo 0x<swaphunt-address>
+Price: $0.005 USDC on eip155:8453, payTo 0x<swaphunt-address>
 200 {'value': 30, 'label': 'Fear', 'timestamp': '2026-10-31T00:00:00', 'source': 'alternative.me', 'attribution': 'Data provided by Alternative.me Crypto Fear & Greed Index'}
-This run cost $0.001 (tx https://basescan.org/tx/0x<transaction-hash>)
+This run cost $0.005 (tx https://basescan.org/tx/0x<transaction-hash>)
 ```
 
 Open the basescan link to see the USDC transfer on-chain.

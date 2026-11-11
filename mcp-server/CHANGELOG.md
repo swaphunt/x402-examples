@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (2026-11-11)
+
+- Changed: the price a tool may pay is read from the API's own price list, `/.well-known/x402` on the same host, fetched on the first paid call and again after an hour. A price change on the API no longer needs a new release. A 402 that asks for more than the list says is still refused before anything is signed, in dry runs too. If the list cannot be fetched, the price built into the release is the limit (a list fetched earlier stays in use until a fetch succeeds).
+- Added: a single call that costs more than `MAX_SPEND_USD` is refused before signing, in dry runs too.
+- Changed: built-in prices follow SwapHunt's price test from 2026-11: `get_fear_greed`, `get_price`, `get_trading_session` and `get_weekend_liquidity` $0.005; `get_market_regime` and `get_volatility` $0.010; `get_funding_rates`, `get_coin_strength` and `get_momentum_rank` $0.015. Version 0.5.0 refuses these nine tools once the API charges the new prices; upgrade with `uvx swaphunt-mcp@latest`.
+- Tests: the fake API serves `/.well-known/x402`; new tests for a price change in the list, a 402 above the list, an unavailable list (fallback), one fetch per session and the `MAX_SPEND_USD` limit.
+
 ## 0.5.0 (2026-11-09)
 
 - Added: `PAYTO_ALLOWLIST`, a comma-separated list of addresses the server may pay. A quote to any other `payTo` is refused before anything is signed, in dry runs too. A malformed entry stops the server at start. Without it, any `payTo` can be paid (still capped by `MAX_SPEND_USD`), and the server says so on stderr when payments are on.
