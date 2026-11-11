@@ -8,13 +8,13 @@ The example shows the mechanics: paying several x402 endpoints in one run, keepi
 |---|---|---|
 | `/v1/market/fear-greed/compare` | $0.002 | Market mood (Fear & Greed Index, 0-100) today, with the change over 1, 7 and 30 days |
 | `/v1/market/halving?coin=BTC` | $0.001 | Bitcoin halving countdown: blocks and estimated days remaining |
-| `/v1/context/session` | $0.001 | Current trading session (Asia, London, New York, off-hours) and its typical volatility |
-| `/v1/context/weekend-liquidity` | $0.001 | Weekend or low-liquidity window, with a 0-100 liquidity score |
-| **Total per run** | **$0.005** | $0.15 per month at one run a day |
+| `/v1/context/session` | $0.005 | Current trading session (Asia, London, New York, off-hours) and its typical volatility |
+| `/v1/context/weekend-liquidity` | $0.005 | Weekend or low-liquidity window, with a 0-100 liquidity score |
+| **Total per run** | **$0.013** | $0.39 per month at one run a day |
 
 The session and liquidity readings describe the moment the script runs, so pick a cron time that matters to you.
 
-The LLM writing the brief is extra. The script prints the input and output token counts on every run, so you can work out the cost from your provider's per-token prices ([Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)). With `LLM_PROVIDER=ollama` the LLM is free and a run costs only the $0.005 in x402 payments.
+The LLM writing the brief is extra. The script prints the input and output token counts on every run, so you can work out the cost from your provider's per-token prices ([Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)). With `LLM_PROVIDER=ollama` the LLM is free and a run costs only the $0.013 in x402 payments.
 
 The Fear & Greed data comes from Alternative.me, which asks for attribution next to its data. The script adds that attribution line below the brief (a fixed text, not taken from the API response).
 
@@ -34,7 +34,7 @@ cp ../.env.example ../.env    # then fill in PRIVATE_KEY and the LLM / delivery 
 ```bash
 set -a; . ../.env; set +a        # load settings into the environment
 .venv/bin/python brief.py        # dry run: shows prices, pays nothing, no LLM call
-.venv/bin/python brief.py --pay  # pays $0.005, writes and delivers the brief
+.venv/bin/python brief.py --pay  # pays $0.013, writes and delivers the brief
 ```
 
 Before paying, the script checks that the run total stays under `MAX_SPEND_USD` (default $0.10) and that the LLM is usable. Each payment is locked to the amount, network and `payTo` address shown in the dry run: if the server asks for anything else, the script refuses to pay.
@@ -59,16 +59,16 @@ Dry run:
 Prices (from the 402 responses):
   /v1/market/fear-greed/compare    $0.002  eip155:8453  payTo 0x<swaphunt-address>
   /v1/market/halving               $0.001  eip155:8453  payTo 0x<swaphunt-address>
-  /v1/context/session              $0.001  eip155:8453  payTo 0x<swaphunt-address>
-  /v1/context/weekend-liquidity    $0.001  eip155:8453  payTo 0x<swaphunt-address>
-  total: $0.005 per run (cap MAX_SPEND_USD=0.1)
+  /v1/context/session              $0.005  eip155:8453  payTo 0x<swaphunt-address>
+  /v1/context/weekend-liquidity    $0.005  eip155:8453  payTo 0x<swaphunt-address>
+  total: $0.013 per run (cap MAX_SPEND_USD=0.1)
 Dry run: nothing paid, no LLM call. Re-run with --pay to pay.
 ```
 
 A paid run prints one `paying $0.00x for /v1/... ok (tx 0x<hash>…)` line per endpoint, then the brief (5-8 sentences followed by the Alternative.me attribution line), then a last line with the cost and token counts:
 
 ```
-This run cost $0.005 in x402 payments. LLM: <model>, <n> input + <n> output tokens
+This run cost $0.013 in x402 payments. LLM: <model>, <n> input + <n> output tokens
 ```
 
 ## Run it daily with cron

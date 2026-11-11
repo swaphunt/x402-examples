@@ -134,7 +134,7 @@ def test_tools_and_server_identify_themselves(api):
 def test_dry_run_pays_nothing_and_sends_user_agent(api, key):
     # A key is configured but X402_PAY is not set: still a dry run.
     _, _, (dry, spending) = mcp_run({"PRIVATE_KEY": key}, [("get_fear_greed", {}), ("get_spending", {})])
-    assert dry["dry_run"] is True and dry["would_cost_usd"] == 0.001
+    assert dry["dry_run"] is True and dry["would_cost_usd"] == 0.005
     assert dry["network"] == "eip155:8453" and dry["pay_to"] == PAY_TO
     assert signed_requests() == [] and fake_swaphunt.paid_log == []
     assert spending["spent_usd"] == 0 and spending["paid_calls"] == 0
@@ -154,13 +154,13 @@ def test_pays_and_caps_the_session(api, key):
     calls = [("get_fear_greed", {}), ("get_market_regime", {}), ("get_halving", {}),
              ("get_trading_session", {}), ("get_spending", {})]
     _, _, (fg, regime, halving, capped, spending) = mcp_run(
-        {"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "0.004"}, calls)
-    assert fg["cost_usd"] == 0.001 and fg["tx"].startswith("https://basescan.org/tx/0x")
+        {"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "0.016"}, calls)
+    assert fg["cost_usd"] == 0.005 and fg["tx"].startswith("https://basescan.org/tx/0x")
     assert fg["data"]["path"] == "/v1/market/fear-greed"
-    assert regime["cost_usd"] == 0.002 and halving["session_spent_usd"] == pytest.approx(0.004)
+    assert regime["cost_usd"] == 0.010 and halving["session_spent_usd"] == pytest.approx(0.016)
     assert halving["session_remaining_usd"] == pytest.approx(0)
     assert "Session spending cap reached" in capped["error"]
-    assert spending["paid_calls"] == 3 and spending["spent_usd"] == pytest.approx(0.004)
+    assert spending["paid_calls"] == 3 and spending["spent_usd"] == pytest.approx(0.016)
     assert [p["path"] for p in fake_swaphunt.paid_log] == [
         "/v1/market/fear-greed", "/v1/regime/current", "/v1/market/halving"]
     assert all(p["to"].lower() == PAY_TO.lower() for p in fake_swaphunt.paid_log)
@@ -171,14 +171,17 @@ def test_pays_and_caps_the_session(api, key):
 
 def test_cap_of_zero_pays_nothing(api, key):
     _, _, (res,) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "0"}, [("get_fear_greed", {})])
-    assert "Session spending cap reached" in res["error"] and signed_requests() == []
+    # A single call above the whole cap is refused before the session budget is even consulted.
+    assert res["error"].startswith("Refused: /v1/market/fear-greed costs $0.005, more than MAX_SPEND_USD=$0.")
+    assert signed_requests() == []
 
 
 def test_refuses_price_above_advertised(api, key, monkeypatch):
     monkeypatch.setenv("FAKE_PRICE_FACTOR", "2")  # read by the fake API in this process
     _, _, (res, dry) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "1"},
                                [("get_funding_rates", {}), ("get_spending", {})])
-    assert res["error"].startswith("Refused: /v1/derivatives/funding-rates now costs $0.006")
+    assert res["error"].startswith("Refused: /v1/derivatives/funding-rates now costs $0.030, more than the advertised "
+                                    "$0.015 (the API's price list)")
     assert signed_requests() == [] and dry["spent_usd"] == 0
     _, _, (res,) = mcp_run({}, [("get_funding_rates", {})])  # a dry run reports the refusal too
     assert res["error"].startswith("Refused:")
@@ -196,7 +199,55 @@ def test_failed_paid_call_counts_as_possibly_paid(api, key, monkeypatch):
     monkeypatch.setenv("FAKE_STATUS", "503")
     _, _, (res, spending) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key},
                                     [("get_fear_greed", {}), ("get_spending", {})])
-    assert res["error"].startswith("Possibly paid $0.001") and spending["spent_usd"] == 0.001
+    assert res["error"].startswith("Possibly paid $0.005") and spending["spent_usd"] == 0.005
+
+
+# --- Advertised prices from /.well-known/x402 --------------------------------
+
+def test_price_change_in_the_price_list_needs_no_release(api, key, monkeypatch):
+    # The API doubles a price and lists it in /.well-known/x402: the same release pays it.
+    monkeypatch.setenv("FAKE_PRICE_FACTOR", "2")
+    monkeypatch.setenv("FAKE_LIST_FACTOR", "2")
+    _, _, (res, dry) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "1"},
+                               [("get_funding_rates", {}), ("get_trading_session", {})])
+    assert res["cost_usd"] == pytest.approx(0.030) and dry["cost_usd"] == pytest.approx(0.010)
+    assert [p["amount"] for p in fake_swaphunt.paid_log] == ["30000", "10000"]
+
+
+def test_refuses_a_402_above_the_price_list(api, key, monkeypatch):
+    monkeypatch.setenv("FAKE_PRICE_FACTOR", "3")
+    monkeypatch.setenv("FAKE_LIST_FACTOR", "2")  # the list allows more than the built-in price, the 402 more still
+    _, _, (res, spending) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "1"},
+                                    [("get_funding_rates", {}), ("get_spending", {})])
+    assert res["error"].startswith("Refused: /v1/derivatives/funding-rates now costs $0.045, more than the "
+                                   "advertised $0.030 (the API's price list)")
+    assert signed_requests() == [] and spending["spent_usd"] == 0
+
+
+def test_price_list_unavailable_falls_back_to_built_in_prices(api, key, monkeypatch):
+    monkeypatch.setenv("FAKE_LIST_STATUS", "503")
+    _, _, (ok,) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key}, [("get_fear_greed", {})])
+    assert ok["cost_usd"] == 0.005  # the built-in price allows the live 402
+    monkeypatch.setenv("FAKE_PRICE_FACTOR", "2")
+    monkeypatch.setenv("FAKE_LIST_FACTOR", "2")  # ignored: the list cannot be fetched
+    _, _, (res,) = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key, "MAX_SPEND_USD": "1"}, [("get_fear_greed", {})])
+    assert res["error"].startswith("Refused: /v1/market/fear-greed now costs $0.010, more than the advertised "
+                                   "$0.005 (the price built into this release)")
+    assert len(fake_swaphunt.paid_log) == 1
+
+
+def test_price_list_is_fetched_once_per_hour_not_per_call(api, key):
+    _, _, results = mcp_run({"X402_PAY": "1", "PRIVATE_KEY": key},
+                            [("get_fear_greed", {}), ("get_market_regime", {}), ("get_halving", {})])
+    assert all("cost_usd" in r for r in results) and fake_swaphunt.price_list_fetches == 1
+
+
+def test_refuses_a_price_above_max_spend(api, key, monkeypatch):
+    monkeypatch.setenv("FAKE_PRICE_FACTOR", "10")
+    monkeypatch.setenv("FAKE_LIST_FACTOR", "10")  # listed, but more than the user's cap
+    _, _, (res,) = mcp_run({"MAX_SPEND_USD": "0.10"}, [("get_funding_rates", {})])
+    assert res["error"].startswith("Refused: /v1/derivatives/funding-rates costs $0.150, more than MAX_SPEND_USD=$0.1")
+    assert signed_requests() == []
 
 
 # --- PAYTO_ALLOWLIST ----------------------------------------------------------
@@ -215,7 +266,7 @@ def test_payto_allowlist_allows_listed_address(api, key):
     # Case does not matter, and several addresses may be listed.
     env = {"X402_PAY": "1", "PRIVATE_KEY": key, "PAYTO_ALLOWLIST": f"{OTHER_PAY_TO}, {PAY_TO.upper().replace('0X', '0x')}"}
     _, _, (res,) = mcp_run(env, [("get_fear_greed", {})])
-    assert res["cost_usd"] == 0.001 and len(fake_swaphunt.paid_log) == 1
+    assert res["cost_usd"] == 0.005 and len(fake_swaphunt.paid_log) == 1
 
 
 def test_payto_allowlist_rejects_bad_entries(api):

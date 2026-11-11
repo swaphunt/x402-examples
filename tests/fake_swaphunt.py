@@ -13,6 +13,9 @@ Test knobs (environment, read on every request):
     FAKE_PAY_TO         payTo address to quote (default: the snapshot's address)
     FAKE_SWITCH_PAY_TO  quote this payTo from the second 402 on (tests the payment lock)
     FAKE_STATUS         status for paid requests (e.g. 503 to test failures)
+    FAKE_LIST_FACTOR    multiply every price in /.well-known/x402 (default 1, independent of the 402s)
+    FAKE_LIST_STATUS    status for /.well-known/x402 (e.g. 503: the price list is unavailable)
+/.well-known/x402 lists every endpoint with its USDC-on-Base amount, like the real API's price list.
 A coin, symbol or asset of NOTCOVERED gets 422 not_covered before any 402, like the real API.
 """
 import hashlib
@@ -35,6 +38,7 @@ USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 NOT_COVERED = "NOTCOVERED"
 
 quotes_served = 0
+price_list_fetches = 0
 requests_log: list[dict] = []  # every request to an endpoint: path, query, User-Agent, signed or not
 paid_log: list[dict] = []      # every request the fake "settled"
 
@@ -83,8 +87,25 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def price_list(self):
+        global price_list_fetches
+        price_list_fetches += 1
+        status = int(os.getenv("FAKE_LIST_STATUS", "200"))
+        if status != 200:
+            return self._send(status, {"error": "fake failure"})
+        factor = float(os.getenv("FAKE_LIST_FACTOR", "1"))
+        host = f"http://{self.headers.get('Host', 'fake')}"
+        resources = [{"url": host + e["path"], "method": "GET", "price": f"${int(e['amount']) * factor / 1e6:g}",
+                      "accepts": [{"scheme": "exact", "network": "eip155:8453", "asset": USDC,
+                                   "amount": str(int(int(e["amount"]) * factor)), "payTo": e["pay_to"]}]}
+                     for e in FIXTURE["endpoints"]]
+        self._send(200, {"x402Version": 2, "kind": "resource-server", "name": "SwapHunt (fake)",
+                         "resources": resources})
+
     def do_GET(self):
         url = urlsplit(self.path)
+        if url.path == "/.well-known/x402":
+            return self.price_list()
         e = ENDPOINTS.get(url.path)
         if e is None:
             return self._send(404, {"detail": "Not Found"})
@@ -118,8 +139,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def reset() -> None:
-    global quotes_served
+    global quotes_served, price_list_fetches
     quotes_served = 0
+    price_list_fetches = 0
     requests_log.clear()
     paid_log.clear()
 
