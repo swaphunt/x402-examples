@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0 (2026-11-12)
 
 - Added: `pm_fees`, a free tool that runs locally. It gives the exact trading fee for one order on Kalshi, Polymarket US or polymarket.com: `fee_usd`, `fee_pct_of_trade_value`, the break-even exit price for a round trip, and the rates' `as_of` (plus Kalshi's fee schedule version). It is computed by [pmfees](https://github.com/swaphunt/pmfees) 0.1.1 (new dependency, pinned) from each platform's official fee schedule. No API call and no payment, and it does not count against `MAX_SPEND_USD`. Annotations: `readOnlyHint`, not destructive, closed world.
 - Orders a platform would not accept return `{"error": "invalid_input"}` with pmfees' reason. Examples: fractional Kalshi contracts, Polymarket US sizes that are not a multiple of 0.01, polymarket.com without a category, a price outside 0-1, an unknown tier or multiplier.
