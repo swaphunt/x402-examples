@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.swaphunt/swaphunt-mcp",
   "title": "SwapHunt crypto market context",
-  "description": "Hyperliquid prices, regime, vol, funding, dip/FOMO checks, plus Fear & Greed; USDC per call (x402)",
-  "version": "0.6.0",
+  "description": "Hyperliquid prices, regime, vol, funding, FOMO checks (x402, USDC); free Kalshi/Polymarket fees",
+  "version": "0.7.0",
   "websiteUrl": "https://x402.swaphunt.dev/docs",
   "repository": {
     "url": "https://github.com/swaphunt/x402-examples",
@@ -22,7 +22,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "swaphunt-mcp",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

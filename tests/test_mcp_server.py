@@ -31,6 +31,7 @@ FIXTURE = json.loads((ROOT / "tests/fixtures/endpoints_402.json").read_text())
 ENDPOINTS = {e["path"]: e for e in FIXTURE["endpoints"]}
 PAY_TO = FIXTURE["endpoints"][0]["pay_to"]
 OTHER_PAY_TO = "0x000000000000000000000000000000000000dEaD"
+FREE_TOOLS = {"get_spending", "pm_fees"}  # local, never call the API
 REQUIRED_ARGS = {"is_this_a_breakout": {"level": 1.0}, "is_this_support": {"level": 1.0}}
 ENV_KEYS = ("FAKE_PRICE_FACTOR", "FAKE_PAY_TO", "FAKE_SWITCH_PAY_TO", "FAKE_STATUS", "X402_PAY", "PRIVATE_KEY",
             "PRIVATE_KEY_FILE", "MAX_SPEND_USD", "PAYTO_ALLOWLIST", "SWAPHUNT_API_URL")
@@ -95,8 +96,8 @@ def signed_requests() -> list[dict]:
 
 def test_every_tool_matches_the_api_contract(api):
     _, tools, _ = mcp_run({}, [])
-    paid = [t for t in tools if t.name != "get_spending"]
-    assert {t.name for t in tools} >= {"get_spending"} and len(paid) == len(ENDPOINTS)
+    paid = [t for t in tools if t.name not in FREE_TOOLS]
+    assert {t.name for t in tools} >= FREE_TOOLS and len(paid) == len(ENDPOINTS)
     _, _, results = mcp_run({}, [(t.name, REQUIRED_ARGS.get(t.name, {})) for t in paid])
     log = fake_swaphunt.requests_log
     assert len(log) == len(paid), "each dry run sends exactly one unpaid request"
@@ -124,7 +125,7 @@ def test_every_tool_matches_the_api_contract(api):
 def test_tools_and_server_identify_themselves(api):
     init, tools, (spending,) = mcp_run({}, [("get_spending", {})])
     assert init.server_info.name == "swaphunt" and init.server_info.version == VERSION
-    assert len(tools) == len(ENDPOINTS) + 1
+    assert len(tools) == len(ENDPOINTS) + len(FREE_TOOLS)
     assert spending == {"payments_enabled": False, "spent_usd": 0.0, "paid_calls": 0, "cap_usd": 0.1,
                         "remaining_usd": 0.1}
 
@@ -311,3 +312,63 @@ def test_versions_and_settings_agree():
     readme = (PKG / "README.md").read_text()
     for name in env_names:
         assert f"`{name}`" in readme, f"README does not document {name}"
+
+
+# --- pm_fees: free, local (pmfees) --------------------------------------------
+# Expected values are the worked examples in pmfees' README (github.com/swaphunt/pmfees).
+
+PM_README_EXAMPLES = [
+    ({"platform": "kalshi", "price": 0.33, "contracts": 7}, 0.1084),  # 2.31 + 0.108339 -> 2.4184
+    ({"platform": "kalshi", "price": 0.50, "contracts": 1}, 0.0175),  # centicent rounding, not $0.02
+    ({"platform": "kalshi", "price": 0.50, "contracts": 100}, 1.75),
+    ({"platform": "kalshi", "price": 0.25, "contracts": 100, "multiplier": 0.5}, 0.6563),
+    ({"platform": "kalshi", "price": 0.50, "contracts": 100, "side": "maker"}, 0.0),  # maker M defaults to 0
+    ({"platform": "kalshi", "price": 0.50, "contracts": 100, "side": "maker", "multiplier": 1}, 0.4375),
+    ({"platform": "polymarket-us", "price": 0.10, "contracts": 1000, "tier": "4"}, 6.26),
+    ({"platform": "polymarket", "price": 0.25, "contracts": 100, "category": "Crypto"}, 1.3125),
+]
+
+
+def test_pm_fees_matches_pmfees_readme_examples(api):
+    _, tools, results = mcp_run({}, [("pm_fees", args) for args, _ in PM_README_EXAMPLES] + [("get_spending", {})])
+    for (args, want), res in zip(PM_README_EXAMPLES, results):
+        assert "error" not in res, (args, res)
+        assert res["fee_usd"] == pytest.approx(want), (args, res["fee_usd"])
+    k = results[0]
+    assert k["platform"] == "kalshi" and k["side"] == "taker" and k["direction"] == "buy"
+    assert k["fee_schedule_version"] == "7.7.26" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", k["as_of"])
+    assert results[2]["fee_pct_of_trade_value"] == pytest.approx(3.5)
+    assert results[6]["fee_schedule_version"] is None and results[6]["as_of"]
+    assert fake_swaphunt.requests_log == [], "pm_fees must not call the API"
+    assert results[-1]["spent_usd"] == 0 and results[-1]["paid_calls"] == 0
+    tool = next(t for t in tools if t.name == "pm_fees")
+    a = tool.annotations
+    assert a.read_only_hint is True and a.destructive_hint is False and a.open_world_hint is False
+    assert "Free" in tool.description and "Costs $" not in tool.description
+    assert set(tool.input_schema["required"]) == {"platform", "price", "contracts"}
+
+
+def test_pm_fees_break_even_matches_pmfees_readme(api):
+    _, _, (res,) = mcp_run({}, [("pm_fees", {"platform": "polymarket-us", "price": 0.40, "contracts": 500,
+                                             "tier": "2"})])
+    assert res["break_even"]["exit_price"] == pytest.approx(0.45) and res["break_even"]["move_cents"] == pytest.approx(5)
+    assert res["break_even"]["exit_direction"] == "sell"
+
+
+def test_pm_fees_rejects_invalid_orders_with_pmfees_messages(api):
+    calls = [
+        ("pm_fees", {"platform": "kalshi", "price": 0.5, "contracts": 1.5}),
+        ("pm_fees", {"platform": "polymarket-us", "price": 0.5, "contracts": 1.255}),
+        ("pm_fees", {"platform": "polymarket", "price": 0.5, "contracts": 10}),
+        ("pm_fees", {"platform": "kalshi", "price": 1.2, "contracts": 1}),
+        ("pm_fees", {"platform": "polymarket-us", "price": 0.5, "contracts": 1, "tier": "9"}),
+    ]
+    _, _, results = mcp_run({}, calls)
+    msgs = [r["message"] for r in results]
+    assert all(r["error"] == "invalid_input" for r in results), results
+    assert "multiple of 1 on kalshi" in msgs[0]
+    assert "multiple of 0.01 on polymarket-us" in msgs[1]
+    assert "needs a category" in msgs[2] and "Crypto" in msgs[2]
+    assert "price must be between 0 and 1" in msgs[3]
+    assert "unknown Polymarket US tier 9" in msgs[4]
+    assert fake_swaphunt.requests_log == []

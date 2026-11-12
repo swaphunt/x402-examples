@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+- Added: `pm_fees`, a free tool that runs locally. It gives the exact trading fee for one order on Kalshi, Polymarket US or polymarket.com: `fee_usd`, `fee_pct_of_trade_value`, the break-even exit price for a round trip, and the rates' `as_of` (plus Kalshi's fee schedule version). It is computed by [pmfees](https://github.com/swaphunt/pmfees) 0.1.1 (new dependency, pinned) from each platform's official fee schedule. No API call and no payment, and it does not count against `MAX_SPEND_USD`. Annotations: `readOnlyHint`, not destructive, closed world.
+- Orders a platform would not accept return `{"error": "invalid_input"}` with pmfees' reason. Examples: fractional Kalshi contracts, Polymarket US sizes that are not a multiple of 0.01, polymarket.com without a category, a price outside 0-1, an unknown tier or multiplier.
+- Tests: pmfees' README examples (Kalshi 0.33 × 7 = $0.1084, centicent rounding, multipliers and maker, Polymarket US tier 4, polymarket.com Crypto, break-even), the error messages, the annotations, and that the tool sends no request to the API.
+
 ## 0.6.0 (2026-11-11)
 
 - Changed: the price a tool may pay is read from the API's own price list, `/.well-known/x402` on the same host, fetched on the first paid call and again after an hour. A price change on the API no longer needs a new release. A 402 that asks for more than the list says is still refused before anything is signed, in dry runs too. If the list cannot be fetched, the price built into the release is the limit (a list fetched earlier stays in use until a fetch succeeds).
