@@ -4,6 +4,8 @@
 
 An [MCP](https://modelcontextprotocol.io) server that gives Claude and other AI agents 30 paid SwapHunt tools: prices, BTC market regime, chop detection, volatility, expected move, funding rates, the Alt Season Index, coin strength, momentum and correlation vs BTC, and anti-FOMO sanity checks (is this a dip, a breakout, support, oversold; how late am I, pump age, extension, green-candle streak), all computed from Hyperliquid perpetuals (USDC-margined); plus the Crypto Fear & Greed Index (current, compared with earlier days, and daily history), the halving countdown, and the current trading session and weekend liquidity. The agent pays per call in USDC on Base via x402, from a wallet you control, with a spending cap per session.
 
+One tool is free and runs entirely on your machine: `pm_fees` computes the exact trading fee for an order on Kalshi, Polymarket US or polymarket.com with [pmfees](https://github.com/swaphunt/pmfees), from each platform's official fee schedule. It makes no API call and pays nothing.
+
 Every tool description states its price, so the agent can see what a call costs before making it. Prices can change: the server reads the current prices from the API's price list, [`/.well-known/x402`](https://x402.swaphunt.dev/.well-known/x402), and the prices in the table below are the ones built into this release.
 
 ```bash
@@ -15,6 +17,7 @@ uvx swaphunt-mcp            # needs uv: https://docs.astral.sh/uv/
 | Tool | Price | What it returns |
 |---|---|---|
 | `get_spending` | free | What the session has spent and how much budget is left |
+| `pm_fees` | free, local | Trading fee for one order on Kalshi, Polymarket US or polymarket.com, fee as % of trade value, break-even exit price, rates `as_of` (and Kalshi's fee schedule version). See [Prediction market fees](#prediction-market-fees-pm_fees) |
 | `get_fear_greed` | $0.005 | Crypto Fear & Greed Index (0-100) with its label |
 | `get_fear_greed_compare` | $0.002 | The index now vs yesterday, 7 and 30 days ago, with the changes |
 | `get_fear_greed_history` | $0.005 | Daily index values for up to 365 days |
@@ -68,6 +71,34 @@ An uncovered coin returns, for example:
  "symbol": "SEI", "covered": ["AAVE", "ADA", "AERO", "...", "kPEPE"],
  "coverage_rule": "Top 50 Hyperliquid perpetuals by 30-day notional volume (stablecoins excluded), recomputed daily. ..."}
 ```
+
+### Prediction market fees (`pm_fees`)
+
+Free and local: computed by [pmfees](https://github.com/swaphunt/pmfees) inside the server, with the rates bundled in the pinned pmfees release. No API call, no payment, nothing counts against `MAX_SPEND_USD`. Read-only (`readOnlyHint: true`, `openWorldHint: false`).
+
+| Parameter | |
+|---|---|
+| `platform` | `kalshi`, `polymarket-us` or `polymarket` (polymarket.com) |
+| `price` | Contract price in dollars, 0 < price < 1 |
+| `contracts` | Order size: whole contracts on Kalshi, steps of 0.01 on Polymarket US, up to 6 decimals on polymarket.com |
+| `side` | `taker` (default) or `maker` |
+| `direction` | `buy` (default) or `sell`; the break-even exit is the opposite order |
+| `category` | Required for `polymarket`: Crypto, Sports, Economics, Culture, Weather, Other, Combos, Finance, Politics, Mentions, Tech, Geopolitics |
+| `tier` | Polymarket US taker tier `1`-`4` or `new` (default 1, the highest rate) |
+| `multiplier` | Kalshi series multiplier M: `1`, `0.5` or `0` (default 1 for takers, 0 for makers) |
+
+Kalshi, 7 contracts at 33¢ (fee + position cost rounds up to a whole centicent):
+
+```json
+{"platform": "kalshi", "side": "taker", "direction": "buy", "price": 0.33, "contracts": 7.0,
+ "trade_value_usd": 2.31, "fee_usd": 0.1084, "fee_pct_of_trade_value": 4.6926, "raw_fee_usd": 0.108339,
+ "break_even": {"exit_direction": "sell", "exit_price": 0.37, "move_cents": 4.0, "...": "..."},
+ "as_of": "2026-11-10", "fee_schedule_version": "7.7.26", "pmfees_version": "0.1.1", "...": "..."}
+```
+
+An order the platform would not accept returns pmfees' reason, for example `{"error": "invalid_input", "message": "contracts must be a multiple of 1 on kalshi (whole contracts only, e.g. 7)", "platform": "kalshi"}`.
+
+Not modelled (as in pmfees): Polymarket US combo fees and maker rebates, polymarket.com rebate programs, and per-market exceptions. The SwapHunt x402 API also sells the same calculation as `/v1/pm/fees`; this tool does not call it.
 
 Fear & Greed results include an `attribution` field. Alternative.me, the source of the index, asks for that text next to its data, and the tool descriptions tell the agent to include it.
 

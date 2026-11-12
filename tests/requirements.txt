@@ -1,3 +1,4 @@
 -r ../quickstart/python/requirements.txt
 mcp==2.3.0
+pmfees==0.1.1
 pytest==8.4.2

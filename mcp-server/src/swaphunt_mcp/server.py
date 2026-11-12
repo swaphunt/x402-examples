@@ -8,6 +8,8 @@ Prices: the price a call may cost is read from the API's own price list, /.well-
 host (cached for an hour), so a price change needs no new release. A 402 that asks for more than that list
 says is refused. If the list cannot be fetched, the prices built into this release are used instead.
 
+pm_fees is free and runs locally with pmfees (https://github.com/swaphunt/pmfees): no API call, no payment.
+
 Run:  uvx swaphunt-mcp            (stdio, for Claude Desktop / Claude Code)
       uvx swaphunt-mcp --check    (compare advertised prices with the live API, pays nothing)
 """
@@ -17,13 +19,15 @@ import os
 import re
 import sys
 import time
-from typing import Any
+from decimal import Decimal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 import httpx
+import pmfees
 from eth_account import Account
 from mcp.server import MCPServer
-from mcp.types import Icon
+from mcp.types import Icon, ToolAnnotations
 from x402 import x402Client
 
 from swaphunt_mcp import __version__
@@ -301,6 +305,63 @@ def paid(price: float, summary: str):
 async def get_spending() -> dict:
     return {"payments_enabled": PAY, "spent_usd": round(_spent, 6), "paid_calls": _calls,
             "cap_usd": MAX_SPEND, "remaining_usd": round(MAX_SPEND - _spent, 6)}
+
+
+# --- Prediction market fees (free, local) ----------------------------------
+# Computed in-process by pmfees from its bundled, sourced fee schedules. No network, no x402.
+
+LOCAL = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
+
+
+def _num(d: Decimal | None) -> float | None:
+    return None if d is None else float(d)
+
+
+@mcp.tool(
+    description="Free, runs locally (no API call, no payment). Exact trading fee for one order on Kalshi, "
+                "Polymarket US or polymarket.com, from each platform's official fee schedule via pmfees: "
+                "fee_usd, fee_pct_of_trade_value and the break-even exit price for a round trip, with the "
+                "rates' as_of date (and Kalshi's fee schedule version). price is in dollars (0 < price < 1). "
+                "contracts must match the platform's order size: whole contracts on Kalshi, steps of 0.01 on "
+                "Polymarket US, up to 6 decimals on polymarket.com. polymarket needs a category (e.g. Crypto, "
+                "Sports, Politics). Optional: tier (Polymarket US 1-4 or new, default 1), multiplier (Kalshi "
+                "series M: 1, 0.5 or 0). side is taker or maker; direction is buy or sell (the break-even exit "
+                "is the opposite order).",
+    annotations=LOCAL,
+)
+async def pm_fees(platform: Literal["kalshi", "polymarket-us", "polymarket"], price: float, contracts: float,
+                  side: Literal["taker", "maker"] = "taker", direction: Literal["buy", "sell"] = "buy",
+                  category: str | None = None, tier: str | None = None,
+                  multiplier: float | None = None) -> dict:
+    kwargs: dict[str, Any] = {"maker": side == "maker"}
+    if category is not None:
+        kwargs["category"] = category
+    if tier is not None:
+        kwargs["tier"] = int(tier) if str(tier).isdigit() else tier
+    if multiplier is not None:
+        kwargs["multiplier"] = multiplier
+    try:
+        r = pmfees.fee(platform, price, contracts, direction, **kwargs)
+        be = pmfees.break_even(platform, price, contracts, direction, **kwargs)
+    except ValueError as e:  # pmfees' own rules: price range, order size step, category, tier, multiplier
+        return {"error": "invalid_input", "message": str(e), "platform": platform}
+    pct = r.fee_pct_of_trade_value
+    return {
+        "platform": r.platform, "platform_name": r.platform_name, "side": r.role, "direction": r.side,
+        "price": float(r.price), "contracts": float(r.contracts), "trade_value_usd": float(r.trade_value),
+        "fee_usd": float(r.fee), "fee_pct_of_trade_value": None if pct is None else round(float(pct), 4),
+        "raw_fee_usd": float(r.raw_fee), "rounding": r.rounding, "formula": r.formula,
+        "break_even": {
+            "exit_direction": "sell" if direction == "buy" else "buy",
+            "exit_price": _num(be.exit_price), "move_cents": _num(be.move_cents),
+            "entry_fee_usd": float(be.entry_fee), "exit_fee_usd": _num(be.exit_fee),
+            "profit_at_exit_usd": _num(be.profit_at_exit),
+        },
+        "details": dict(r.details), "notes": list(r.notes),
+        "as_of": r.rates_as_of, "fee_schedule_version": r.details.get("fee_schedule_version"),
+        "source_url": r.source_url, "pmfees_version": pmfees.__version__,
+        "computed": "locally by pmfees (https://github.com/swaphunt/pmfees); nothing was paid",
+    }
 
 
 # --- Fear & Greed -----------------------------------------------------------
