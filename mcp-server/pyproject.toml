@@ -23,7 +23,7 @@ classifiers = [
 dependencies = [
     "mcp==2.3.0",
     "pmfees==0.1.1",
-    "x402[httpx,evm]==2.26.0",
+    "x402[httpx,evm]==2.27.0",
 ]
 
 [project.urls]
