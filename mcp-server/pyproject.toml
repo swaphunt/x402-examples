@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "swaphunt-mcp"
 dynamic = ["version"]
-description = "MCP server with 30 SwapHunt crypto market tools for AI agents (Hyperliquid prices, regime, volatility, funding, coin strength, anti-FOMO sanity checks; Fear & Greed), paid per call in USDC via x402"
+description = "MCP server with 30 SwapHunt crypto market tools for AI agents (Hyperliquid prices, regime, volatility, funding, coin strength, anti-FOMO sanity checks; Fear & Greed), paid per call in USDC via x402, plus a free local prediction market fee calculator (Kalshi, Polymarket)"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "SwapHunt", email = "github@swaphunt.dev" }]
-keywords = ["mcp", "x402", "crypto", "usdc", "base", "ai-agents", "market-data"]
+keywords = ["mcp", "x402", "crypto", "usdc", "base", "ai-agents", "market-data", "kalshi", "polymarket", "prediction-markets"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -22,6 +22,7 @@ classifiers = [
 # and means every user gets the versions this release was tested with.
 dependencies = [
     "mcp==2.3.0",
+    "pmfees==0.1.1",
     "x402[httpx,evm]==2.26.0",
 ]
 
