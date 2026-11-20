@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 (unreleased)
+
+- Changed: x402 2.28.0 (was 2.26.0). No change to the tools or settings. Tested with all tests, a dry run against the live API and one real $0.001 payment (`get_supported_assets`, MAX_SPEND_USD=0.01, PAYTO_ALLOWLIST set) on 2026-11-20.
+- Note: x402 2.28 logs one INFO line on stderr when it signs a payment (`EthAccountSigner.sign_typed_data: primaryType=TransferWithAuthorization …`). It holds no key or amount, and stderr is not part of the MCP channel.
+
 ## 0.8.0 (2026-11-20)
 
 - Changed: pmfees 0.3.0 (was 0.1.1). `pm_fees` picks polymarket.com's rates by fill time: the old rates before 2026-11-20 23:59 UTC, the new ones from then (e.g. Crypto 0.07 -> 0.01, Tech 0.04 -> 0.05). New optional `at` argument (ISO 8601 fill time, default now; used for polymarket.com). Polymarket US rates as of 2026-11-15.
