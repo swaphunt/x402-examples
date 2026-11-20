@@ -337,7 +337,11 @@ PM_README_EXAMPLES = [
     ({"platform": "kalshi", "price": 0.50, "contracts": 100, "side": "maker"}, 0.0),  # maker M defaults to 0
     ({"platform": "kalshi", "price": 0.50, "contracts": 100, "side": "maker", "multiplier": 1}, 0.4375),
     ({"platform": "polymarket-us", "price": 0.10, "contracts": 1000, "tier": "4"}, 6.26),
-    ({"platform": "polymarket", "price": 0.25, "contracts": 100, "category": "Crypto"}, 1.3125),
+    # polymarket.com changes rates at 2026-11-20 23:59 UTC (Crypto 0.07 -> 0.01), so the fill time is pinned
+    ({"platform": "polymarket", "price": 0.25, "contracts": 100, "category": "Crypto", "at": "2026-11-20T12:00Z"}, 1.3125),
+    ({"platform": "polymarket", "price": 0.25, "contracts": 100, "category": "Crypto", "at": "2026-11-20T23:59Z"}, 0.1875),
+    ({"platform": "polymarket", "price": 0.50, "contracts": 100, "category": "Tech", "at": "2026-11-20T23:58Z"}, 1.0),
+    ({"platform": "polymarket", "price": 0.50, "contracts": 100, "category": "Tech", "at": "2026-11-21T00:00Z"}, 1.25),
 ]
 
 

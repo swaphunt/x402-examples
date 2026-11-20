@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-11-09",
+ "captured_at": "2026-11-20",
  "base_url": "https://x402.swaphunt.dev",
  "endpoints": [
   {
@@ -406,6 +406,5 @@
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {}
   }
- ],
- "note": "Prices of the 9 test-group endpoints set to the 2026-11 price test before the API deploy; refresh with scripts/snapshot_402.py after it. Params 2026-11-20 from the x402-review API branch (symbol/symbols/period, no quote/currency); price and payTo from the live snapshot."
+ ]
 }

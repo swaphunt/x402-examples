@@ -319,16 +319,19 @@ def _num(d: Decimal | None) -> float | None:
 
 @mcp.tool(
     description="Free, runs locally (no API call, no payment). Use when the user asks the fee for an order on "
-                "Kalshi, Polymarket US or polymarket.com. Returns fee_usd, fee % of trade value, break-even exit "
-                "and rates as_of. contracts = USD / price; polymarket needs category. Ex: platform=polymarket, "
-                "price=0.4, contracts=250, category=Politics",
+                "Kalshi, Polymarket US or polymarket.com. Returns fee_usd, fee %, break-even exit, rates as_of. "
+                "contracts = USD / price; polymarket needs category; at = fill time (default now). Ex: "
+                "platform=polymarket, price=0.4, contracts=250, category=Politics",
     annotations=LOCAL,
 )
 async def pm_fees(platform: Literal["kalshi", "polymarket-us", "polymarket"], price: float, contracts: float,
                   side: Literal["taker", "maker"] = "taker", direction: Literal["buy", "sell"] = "buy",
                   category: str | None = None, tier: str | None = None,
-                  multiplier: float | None = None) -> dict:
+                  multiplier: float | None = None, at: str | None = None) -> dict:
     kwargs: dict[str, Any] = {"maker": side == "maker"}
+    if at is not None and platform == "polymarket":
+        # polymarket.com's rates depend on the fill time (new rates from 2026-11-20 23:59 UTC); default now
+        kwargs["at"] = at
     if category is not None:
         kwargs["category"] = category
     if tier is not None:

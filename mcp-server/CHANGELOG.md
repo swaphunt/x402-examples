@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-11-20)
 
+- Changed: pmfees 0.3.0 (was 0.1.1). `pm_fees` picks polymarket.com's rates by fill time: the old rates before 2026-11-20 23:59 UTC, the new ones from then (e.g. Crypto 0.07 -> 0.01, Tech 0.04 -> 0.05). New optional `at` argument (ISO 8601 fill time, default now; used for polymarket.com). Polymarket US rates as of 2026-11-15.
 - Changed: every tool description follows "Use when the user asks … Returns … Ex: …" (at most ~300 characters before the price), the same text as the API's `/.well-known/x402`, with tool names instead of API paths.
 - Changed: one name per argument. A coin is `symbol` (was `asset` on get_price, get_chop_detection, get_volatility, get_market_silence, get_compression_alert, get_expected_move, and `coin` on get_halving, get_coin_strength, get_correlation), several coins are `symbols` (was `assets` on get_prices), and a lookback is `period` (was `lookback` on get_market_silence). The `quote`/`currency` arguments are gone: only USDC exists.
 - Changed: `get_correlation` documents 7d and 30d only (24h is rejected by the API before payment).
-- Release only after the API with the new names is live: an older API ignores `symbol` and would price BTC.
+- Needs the API with the new names (live since 2026-11-20 08:18 UTC); the API still accepts the old names, so 0.7.0 keeps working.
 
 ## 0.7.0 (2026-11-12)
 
