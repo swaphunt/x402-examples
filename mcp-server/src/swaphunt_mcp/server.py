@@ -318,22 +318,20 @@ def _num(d: Decimal | None) -> float | None:
 
 
 @mcp.tool(
-    description="Free, runs locally (no API call, no payment). Exact trading fee for one order on Kalshi, "
-                "Polymarket US or polymarket.com, from each platform's official fee schedule via pmfees: "
-                "fee_usd, fee_pct_of_trade_value and the break-even exit price for a round trip, with the "
-                "rates' as_of date (and Kalshi's fee schedule version). price is in dollars (0 < price < 1). "
-                "contracts must match the platform's order size: whole contracts on Kalshi, steps of 0.01 on "
-                "Polymarket US, up to 6 decimals on polymarket.com. polymarket needs a category (e.g. Crypto, "
-                "Sports, Politics). Optional: tier (Polymarket US 1-4 or new, default 1), multiplier (Kalshi "
-                "series M: 1, 0.5 or 0). side is taker or maker; direction is buy or sell (the break-even exit "
-                "is the opposite order).",
+    description="Free, runs locally (no API call, no payment). Use when the user asks the fee for an order on "
+                "Kalshi, Polymarket US or polymarket.com. Returns fee_usd, fee %, break-even exit, rates as_of. "
+                "contracts = USD / price; polymarket needs category; at = fill time (default now). Ex: "
+                "platform=polymarket, price=0.4, contracts=250, category=Politics",
     annotations=LOCAL,
 )
 async def pm_fees(platform: Literal["kalshi", "polymarket-us", "polymarket"], price: float, contracts: float,
                   side: Literal["taker", "maker"] = "taker", direction: Literal["buy", "sell"] = "buy",
                   category: str | None = None, tier: str | None = None,
-                  multiplier: float | None = None) -> dict:
+                  multiplier: float | None = None, at: str | None = None) -> dict:
     kwargs: dict[str, Any] = {"maker": side == "maker"}
+    if at is not None and platform == "polymarket":
+        # polymarket.com's rates depend on the fill time (new rates from 2026-11-20 23:59 UTC); default now
+        kwargs["at"] = at
     if category is not None:
         kwargs["category"] = category
     if tier is not None:
@@ -367,119 +365,137 @@ async def pm_fees(platform: Literal["kalshi", "polymarket-us", "polymarket"], pr
 # --- Fear & Greed -----------------------------------------------------------
 # Alternative.me asks for attribution next to its data: show the `attribution` field with the values.
 
-@paid(0.005, "Crypto Fear & Greed Index (0-100) with its label, updated daily. "
-             "When showing the value, include the `attribution` text from the result.")
+@paid(0.005, "Use when the user asks how fearful or greedy the crypto market is today. Returns the Crypto "
+             "Fear & Greed Index (0-100), its label (Extreme Fear to Extreme Greed) and the attribution to "
+             "show with it; daily. For trend use get_fear_greed_compare. Show `attribution` with the "
+             "values. Ex: no parameters")
 async def get_fear_greed() -> dict:
     return await call("/v1/market/fear-greed", 0.005)
 
 
-@paid(0.002, "Fear & Greed Index now vs yesterday, 7 and 30 days ago, with the changes. "
-             "When showing the values, include the `attribution` text from the result.")
+@paid(0.002, "Use when the user asks whether crypto sentiment is improving or worsening. Returns Fear & "
+             "Greed now with its label, the values yesterday, 7 and 30 days ago, the changes (change_1d, "
+             "change_7d, change_30d) and the attribution. Show `attribution` with the values. Ex: no "
+             "parameters")
 async def get_fear_greed_compare() -> dict:
     return await call("/v1/market/fear-greed/compare", 0.002)
 
 
-@paid(0.005, "Daily Fear & Greed history: the last `days` (up to 365), or `start_date` to `end_date` "
-             "(YYYY-MM-DD). When showing the values, include the `attribution` text from the result.")
-async def get_fear_greed_history(days: int = 30, start_date: str | None = None,
-                                 end_date: str | None = None) -> dict:
+@paid(0.005, "Use when the user wants the Fear & Greed time series to chart, backtest or compare with "
+             "price. Returns daily value and classification for the last `days` (max 365) or start_date to "
+             "end_date (YYYY-MM-DD), with attribution. Raw series, no summary. Show `attribution` with the "
+             "values. Ex: days=90")
+async def get_fear_greed_history(days: int = 30, start_date: str | None = None, end_date: str | None = None) -> dict:
     return await call("/v1/market/fear-greed/history", 0.005, days=days, start_date=start_date, end_date=end_date)
 
 
 # --- Halving ----------------------------------------------------------------
 
-@paid(0.001, "Halving countdown for `coin` (BTC or LTC): blocks remaining and estimated date of the next halving.")
-async def get_halving(coin: str = "BTC") -> dict:
-    return await call("/v1/market/halving", 0.001, coin=coin)
+@paid(0.001, "Use when the user asks when the next Bitcoin or Litecoin halving is. Returns current and "
+             "halving block, blocks and days remaining, estimated date, progress % and block reward before "
+             "and after. Estimated from block time, not an exact timestamp. Ex: symbol=LTC")
+async def get_halving(symbol: str = "BTC") -> dict:
+    return await call("/v1/market/halving", 0.001, symbol=symbol)
 
 
 # --- Hyperliquid perpetuals -------------------------------------------------
 # Everything below is computed from Hyperliquid perpetuals (USDC-margined); prices are in USDC.
 
-HL = "From Hyperliquid perpetuals (USDC-margined)."
+@paid(0.005, "Use when the user asks the current price of one coin. Returns the mark price (or order-book "
+             "mid with price_type=mid) on Hyperliquid perpetuals in USDC, 24h change % and 24h notional "
+             "volume; high/low are null. For several coins use get_prices. Ex: symbol=ETH")
+async def get_price(symbol: str = "BTC", price_type: str = "mark") -> dict:
+    return await call("/v1/tools/price", 0.005, symbol=symbol, price_type=price_type)
 
 
-@paid(0.005, "Live price of one asset in USDC: perp mark price (`price_type` mark) or order-book mid "
-             "(`price_type` mid), with 24h change and 24h volume. `asset` is any active perp (BTC, ETH, SOL ...; "
-             f"BTCUSDT and BTC-PERP also mean BTC). `currency` is USDC (USD and USDT accepted as aliases). {HL}")
-async def get_price(asset: str = "BTC", currency: str = "USDC", price_type: str = "mark") -> dict:
-    return await call("/v1/tools/price", 0.005, asset=asset, currency=currency, price_type=price_type)
+@paid(0.003, "Use when the user asks the prices of several coins or a portfolio. Returns, keyed by symbol "
+             "(max 20), the mark or mid price on Hyperliquid perpetuals in USDC, 24h change % and 24h "
+             "notional volume; unknown symbols are skipped. Works with one symbol too. Ex: "
+             "symbols=BTC,ETH,SOL")
+async def get_prices(symbols: str = "BTC,ETH", price_type: str = "mark") -> dict:
+    return await call("/v1/tools/price/multi", 0.003, symbols=symbols, price_type=price_type)
 
 
-@paid(0.003, "Prices in USDC for up to 20 assets in one call (`assets` comma-separated, e.g. 'BTC,ETH,SOL'), "
-             "each with 24h change and volume; unknown symbols are skipped. `price_type` mark or mid. "
-             f"Cheaper than several get_price calls. {HL}")
-async def get_prices(assets: str = "BTC,ETH", currency: str = "USDC", price_type: str = "mark") -> dict:
-    return await call("/v1/tools/price/multi", 0.003, assets=assets, currency=currency, price_type=price_type)
-
-
-@paid(0.001, "List of every asset get_price and get_prices can quote: all active perps, by Hyperliquid name "
-             f"(e.g. kPEPE = 1,000 PEPE). {HL}")
+@paid(0.001, "Use when the user asks which coins are supported, or a symbol is uncertain (Hyperliquid "
+             "names, e.g. kPEPE = 1,000 PEPE). Returns every active Hyperliquid perpetuals market, the "
+             "count and `covered`: the top 50 by 30-day volume that analysis routes accept. Ex: no "
+             "parameters")
 async def get_supported_assets() -> dict:
     return await call("/v1/tools/price/supported", 0.001)
 
 
-@paid(0.010, "Current BTC market regime (BULLISH/BEARISH/NEUTRAL): BTC perp price vs its 20-period EMA on 12h "
-             f"candles, with EMA value and slope. Updates at 00:00 and 12:00 UTC. {HL}")
+@paid(0.010, "Use when the user asks whether the crypto market (BTC) is bullish, bearish or neutral. "
+             "Returns the regime from the BTC price on Hyperliquid perpetuals vs its 20-period EMA on 12h "
+             "candles, with EMA, distance and slope; updates 00:00 and 12:00 UTC. BTC only. Ex: no "
+             "parameters")
 async def get_market_regime() -> dict:
     return await call("/v1/regime/current", 0.010)
 
 
-@paid(0.003, "Is `asset` trending or chopping? ADX-based, with +DI/-DI and trend direction, on `timeframe` "
-             f"(1h, 4h, 1d). `quote` is USDC (USD and USDT accepted as aliases). {HL}")
-async def get_chop_detection(asset: str = "BTC", timeframe: str = "4h", quote: str = "USDC") -> dict:
-    return await call("/v1/regime/chop-detection", 0.003, asset=asset, timeframe=timeframe, quote=quote)
+@paid(0.003, "Use when the user asks whether a coin is trending or stuck in a range. Returns is_chop, chop "
+             "level, ADX, +DI/-DI, trend direction and a verdict on 1h, 4h or 1d candles of Hyperliquid "
+             "perpetuals. Any active market. Ex: symbol=SOL, timeframe=4h")
+async def get_chop_detection(symbol: str = "BTC", timeframe: str = "4h") -> dict:
+    return await call("/v1/regime/chop-detection", 0.003, symbol=symbol, timeframe=timeframe)
 
 
-@paid(0.010, "Realized volatility of `asset` over `period` (7d, 14d, 30d): daily and annualized %, a "
-             f"low/normal/high/extreme level and today's UTC range. Backward-looking, not implied vol. {HL}")
-async def get_volatility(asset: str = "BTC", period: str = "7d") -> dict:
-    return await call("/v1/vol/realized", 0.010, asset=asset, period=period)
+@paid(0.010, "Use when the user asks how volatile a coin has been. Returns daily and annualized realized "
+             "volatility % over 7d, 14d or 30d of daily candles on Hyperliquid perpetuals, a "
+             "low/normal/high/extreme level and today's UTC range vs open. Not implied vol. Ex: "
+             "symbol=BTC, period=30d")
+async def get_volatility(symbol: str = "BTC", period: str = "7d") -> dict:
+    return await call("/v1/vol/realized", 0.010, symbol=symbol, period=period)
 
 
-@paid(0.002, "Market-silence score 0-1 for `asset` over `lookback` (7d, 14d, 30d): low volume, low volatility "
-             f"and small price change combined. High silence often comes before a big move. {HL}")
-async def get_market_silence(asset: str = "BTC", lookback: str = "7d") -> dict:
-    return await call("/v1/vol/silence", 0.002, asset=asset, lookback=lookback)
+@paid(0.002, "Use when the user asks whether a coin is unusually quiet. Returns a 0-1 silence score, level "
+             "and advice from today's volume vs the period average, volatility and 24h change on "
+             "Hyperliquid perpetuals (7d, 14d, 30d). For a squeeze use get_compression_alert. Ex: "
+             "symbol=ETH, period=14d")
+async def get_market_silence(symbol: str = "BTC", period: str = "7d") -> dict:
+    return await call("/v1/vol/silence", 0.002, symbol=symbol, period=period)
 
 
-@paid(0.003, "Volatility squeeze detector (Bollinger band width and its percentile) for `asset` on `timeframe` "
-             "(1h, 4h, 1d): extreme/strong/moderate/none. Detects the setup, not the direction. "
-             f"`quote` is USDC (USD and USDT accepted as aliases). {HL}")
-async def get_compression_alert(asset: str = "BTC", timeframe: str = "4h", quote: str = "USDC") -> dict:
-    return await call("/v1/vol/compression-alert", 0.003, asset=asset, timeframe=timeframe, quote=quote)
+@paid(0.003, "Use when the user asks whether a coin is in a volatility squeeze before a breakout. Returns "
+             "is_squeeze, level (extreme, strong, moderate, none), Bollinger width and its percentile on "
+             "1h, 4h or 1d candles of Hyperliquid perpetuals. Setup, not direction. Ex: symbol=BTC, "
+             "timeframe=1d")
+async def get_compression_alert(symbol: str = "BTC", timeframe: str = "4h") -> dict:
+    return await call("/v1/vol/compression-alert", 0.003, symbol=symbol, timeframe=timeframe)
 
 
-@paid(0.003, "ATR-based expected price range for `asset` over `period` (4h, 1d, 1w): 68% and 95% bands around "
-             "the current price, in USDC. A statistical range, not a forecast. "
-             f"`quote` is USDC (USD and USDT accepted as aliases). {HL}")
-async def get_expected_move(asset: str = "BTC", period: str = "1d", quote: str = "USDC") -> dict:
-    return await call("/v1/vol/expected-move", 0.003, asset=asset, period=period, quote=quote)
+@paid(0.003, "Use when the user asks how far a coin may move, or where to put targets and stops. Returns "
+             "ATR(14)-based 68% and 95% price ranges in USDC around the current price on Hyperliquid "
+             "perpetuals for the next 4h, 1d or 1w. A statistical range, not a forecast. Ex: symbol=BTC, "
+             "period=1w")
+async def get_expected_move(symbol: str = "BTC", period: str = "1d") -> dict:
+    return await call("/v1/vol/expected-move", 0.003, symbol=symbol, period=period)
 
 
-@paid(0.015, "Current funding rates for up to 20 coins (`symbols` comma-separated, e.g. 'BTC,ETH,SOL'). Funding "
-             "is hourly: funding_rate_pct is the hourly rate, annualized = hourly x 8760; with 7d/30d averages "
-             f"and a crowding signal. Positive = longs pay shorts. {HL}")
+@paid(0.015, "Use when the user asks the funding rate of specific coins or whether longs or shorts are "
+             "crowded. Returns per coin (max 20) hourly funding % on Hyperliquid perpetuals, annualized (x "
+             "8760), 7d/30d averages, mark price and a crowding signal; positive = longs pay. Ex: "
+             "symbols=BTC,ETH,SOL")
 async def get_funding_rates(symbols: str = "BTC,ETH,SOL") -> dict:
     return await call("/v1/derivatives/funding-rates", 0.015, symbols=symbols)
 
 
-@paid(0.003, "Leaderboard of the `limit` (1-50) most extreme current funding rates across all active perps, "
-             "`sort` highest (crowded longs) or lowest (crowded shorts). Hourly funding, annualized = hourly x 8760. "
-             f"{HL}")
+@paid(0.003, "Use when the user asks which coins have the most extreme funding right now. Returns the top "
+             "`limit` (1-50) current hourly funding rates across all Hyperliquid perpetuals, annualized (x "
+             "8760), sort=highest (crowded longs) or lowest (crowded shorts). Ex: sort=lowest, limit=10")
 async def get_top_funding_rates(limit: int = 10, sort: str = "highest") -> dict:
     return await call("/v1/derivatives/funding-rates/top", 0.003, limit=limit, sort=sort)
 
 
-@paid(0.004, "Settled hourly funding history for one coin (`symbol`) over the last `days` (1-365): average, "
-             "range, share of positive hours and the percentile of the latest rate. `history_days` in the result "
-             f"shows how much history that coin has. Annualized = hourly x 8760. {HL}")
+@paid(0.004, "Use when the user asks whether a coin's funding is unusual for it. Returns settled hourly "
+             "funding on Hyperliquid perpetuals for the last `days` (1-365): average, min/max, annualized "
+             "(x 8760), share of positive hours and the latest rate's percentile. Ex: symbol=ETH, days=90")
 async def get_funding_history(symbol: str = "BTC", days: int = 90) -> dict:
     return await call("/v1/derivatives/funding-rates/history", 0.004, symbol=symbol, days=days)
 
 
-@paid(0.003, "SwapHunt Alt Season Index (0-100), daily: share of the top 100 perps by 30-day volume (excl. BTC "
-             f"and stablecoins) that beat BTC over 90 days. >=75 alt season, <=25 bitcoin season. {HL}")
+@paid(0.003, "Use when the user asks if it is alt season. Returns the SwapHunt Alt Season Index (0-100, "
+             "daily): share of the top 100 Hyperliquid perpetuals by 30-day volume beating BTC over 90 "
+             "days; 75 or above is alt season, 25 or below is bitcoin season. Ex: no parameters")
 async def get_alt_season() -> dict:
     return await call("/v1/market/alt-season", 0.003)
 
@@ -488,97 +504,105 @@ async def get_alt_season() -> dict:
 # These endpoints cover only the top 50 Hyperliquid perpetuals by 30-day volume. Other coins are
 # rejected with HTTP 422 not_covered before any payment is asked; call() returns the covered list.
 
-COV = ("Covers the top 50 Hyperliquid perpetuals by 30-day volume (list in get_supported_assets, field "
-       "`covered`); other coins are rejected with not_covered and not charged.")
+@paid(0.015, "Use when the user asks if a coin is outperforming or lagging BTC. Returns its return minus "
+             "BTC's over 24h, 7d or 30d, a rating (very_strong to very_weak) and the ratio. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "symbol=SOL, period=7d")
+async def get_coin_strength(symbol: str = "ETH", period: str = "24h") -> dict:
+    return await call("/v1/market/coin-strength", 0.015, symbol=symbol, period=period)
 
 
-@paid(0.015, "Strength of `coin` vs BTC: the coin's return minus BTC's over `period` (24h, 7d, 30d), rated "
-             "very_strong/strong/neutral/weak/very_weak. `quote` is USDC (USD and USDT accepted as aliases). "
-             f"{HL} {COV}")
-async def get_coin_strength(coin: str = "ETH", period: str = "24h", quote: str = "USDC") -> dict:
-    return await call("/v1/market/coin-strength", 0.015, coin=coin, period=period, quote=quote)
+@paid(0.015, "Use when the user asks which coins are the biggest gainers or losers. Returns coins ranked "
+             "by 24h, 7d or 30d return: `limit` (1-20) top and bottom, full list, average. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "period=7d, limit=5")
+async def get_momentum_rank(period: str = "24h", limit: int = 10) -> dict:
+    return await call("/v1/market/momentum-rank", 0.015, period=period, limit=limit)
 
 
-@paid(0.015, "Momentum leaderboard: covered coins ranked by return over `period` (24h, 7d, 30d), with the "
-             "`limit` (1-20) top and bottom performers and the full ranking. `quote` is USDC (USD and USDT "
-             f"accepted as aliases). {HL} Ranks only the top 50 Hyperliquid perpetuals by 30-day volume.")
-async def get_momentum_rank(period: str = "24h", limit: int = 10, quote: str = "USDC") -> dict:
-    return await call("/v1/market/momentum-rank", 0.015, period=period, limit=limit, quote=quote)
+@paid(0.003, "Use when the user asks if a coin just tracks BTC. Returns Pearson correlation (-1 to +1) of "
+             "returns vs BTC over 7d (1h candles) or 30d (4h); no 24h. With strength label. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "symbol=ETH, period=30d")
+async def get_correlation(symbol: str = "ETH", period: str = "7d") -> dict:
+    return await call("/v1/market/correlation", 0.003, symbol=symbol, period=period)
 
 
-@paid(0.003, "Pearson correlation (-1 to +1) of `coin`'s returns with BTC's over `period` (7d on 1h candles, "
-             "30d on 4h candles), with a level from very_high to negative. Shows whether a coin moves on its own "
-             f"or just tracks BTC. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
-async def get_correlation(coin: str = "ETH", period: str = "7d", quote: str = "USDC") -> dict:
-    return await call("/v1/market/correlation", 0.003, coin=coin, period=period, quote=quote)
+@paid(0.003, "Use when the user asks if a drop is a real dip or noise. Returns is_dip, drop % from the "
+             "14-day high, 14-day ATR %, drop/ATR and a verdict on daily candles. Top 50 Hyperliquid "
+             "perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: symbol=SOL")
+async def is_this_a_dip(symbol: str = "BTC") -> dict:
+    return await call("/v1/sanity/is-this-a-dip", 0.003, symbol=symbol)
 
 
-@paid(0.003, "Is this a real dip? Drop of `symbol` from its 14-day high compared with its 14-day ATR on daily "
-             "candles; a drop smaller than normal daily volatility is noise. Returns is_dip, drop_pct, atr_pct "
-             f"and a verdict. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
-async def is_this_a_dip(symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/sanity/is-this-a-dip", 0.003, symbol=symbol, quote=quote)
+@paid(0.003, "Use when the user asks if a break of a price level is real or a fakeout. Returns "
+             "is_confirmed, fakeout odds, verdict from volume and 1h closes past the level (USDC, "
+             "required). Top 50 Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), "
+             "others unpaid. Ex: symbol=BTC, level=100000")
+async def is_this_a_breakout(level: float, symbol: str = "BTC", direction: str = "up") -> dict:
+    return await call("/v1/sanity/is-this-a-breakout", 0.003, symbol=symbol, level=level, direction=direction)
 
 
-@paid(0.003, "Is a breakout of `symbol` through `level` (price in USDC, required) confirmed or a likely "
-             "fakeout? `direction` up or down. Uses 1h candles: volume vs the 20-candle average and time held "
-             "beyond the level, with a fakeout probability. `quote` is USDC (USD and USDT accepted as aliases). "
-             f"{HL} {COV}")
-async def is_this_a_breakout(level: float, symbol: str = "BTC", direction: str = "up", quote: str = "USDC") -> dict:
-    return await call("/v1/sanity/is-this-a-breakout", 0.003, symbol=symbol, level=level, direction=direction,
-                      quote=quote)
+@paid(0.003, "Use when the user asks if a price level is real support. Returns touches within 0.5% over 90 "
+             "daily candles, recency, bounce quality, verdict. Level in USDC, required. Top 50 Hyperliquid "
+             "perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: symbol=ETH, "
+             "level=3000")
+async def is_this_support(level: float, symbol: str = "BTC") -> dict:
+    return await call("/v1/sanity/is-this-support", 0.003, symbol=symbol, level=level)
 
 
-@paid(0.003, "Is `level` (price in USDC, required) real support for `symbol`? Checks 90 daily candles for "
-             "repeated, recent touches and clean bounces; returns touch_count, days_since_last_touch, "
-             f"bounce_quality and a verdict. `quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
-async def is_this_support(level: float, symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/sanity/is-this-support", 0.003, symbol=symbol, level=level, quote=quote)
+@paid(0.003, "Use when the user asks if a coin is oversold. Returns is_oversold, RSI(14) on 1h, 4h and 1d, "
+             "a weighted RSI (20/30/50%) and a verdict; not a buy signal alone. Top 50 Hyperliquid "
+             "perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: symbol=BTC")
+async def is_this_oversold(symbol: str = "BTC") -> dict:
+    return await call("/v1/sanity/is-this-oversold", 0.003, symbol=symbol)
 
 
-@paid(0.003, "Is `symbol` really oversold? RSI(14) on 1h, 4h and 1d candles combined into a weighted RSI "
-             "(20/30/50%), with a verdict. `quote` is USDC (USD and USDT accepted as aliases). "
-             f"{HL} {COV}")
-async def is_this_oversold(symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/sanity/is-this-oversold", 0.003, symbol=symbol, quote=quote)
+@paid(0.003, "Use when the user asks if they are too late to buy after a run-up. Returns the move from the "
+             "4h swing low in % and ATR, its percentile vs past moves, early/middle/late verdict. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "symbol=SOL")
+async def how_late_am_i(symbol: str = "BTC") -> dict:
+    return await call("/v1/fomo/how-late-am-i", 0.003, symbol=symbol)
 
 
-@paid(0.003, "How late am I to this move? Distance of `symbol` from its recent swing low on 4h candles, in % "
-             "and ATR multiples, ranked against its own history, with a verdict. `quote` is USDC (USD and USDT "
-             f"accepted as aliases). {HL} {COV}")
-async def how_late_am_i(symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/fomo/how-late-am-i", 0.003, symbol=symbol, quote=quote)
+@paid(0.003, "Use when the user asks if a coin is pumping now and how old the move is. Returns is_pumping, "
+             "start, duration and size vs the average pump in the last 24h of 15m candles. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "symbol=SOL")
+async def get_pump_age(symbol: str = "BTC") -> dict:
+    return await call("/v1/fomo/pump-age", 0.003, symbol=symbol)
 
 
-@paid(0.003, "How old is this pump? Detects an active pump in `symbol` on the last 24 hours of 15m candles: "
-             "start time, duration, size and the average pump length, with a verdict. `quote` is USDC (USD and "
-             f"USDT accepted as aliases). {HL} {COV}")
-async def get_pump_age(symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/fomo/pump-age", 0.003, symbol=symbol, quote=quote)
+@paid(0.003, "Use when the user asks if price is stretched far from its average. Returns distance from "
+             "MA20 and MA50, Bollinger position, z-score on 4h candles, is_extended and a verdict. Top 50 "
+             "Hyperliquid perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: "
+             "symbol=ETH")
+async def is_price_extended(symbol: str = "BTC") -> dict:
+    return await call("/v1/fomo/already-extended", 0.003, symbol=symbol)
 
 
-@paid(0.003, "Is `symbol` already extended? Distance from the 20 and 50 MA on 4h candles, Bollinger band "
-             "position and z-score, with a verdict. `quote` is USDC (USD and USDT accepted as aliases). "
-             f"{HL} {COV}")
-async def is_price_extended(symbol: str = "BTC", quote: str = "USDC") -> dict:
-    return await call("/v1/fomo/already-extended", 0.003, symbol=symbol, quote=quote)
-
-
-@paid(0.003, "Current green-candle streak of `symbol` on `interval` (1h, 4h, 1d) candles, its gain, the "
-             "average streak and how often the next candle was green after similar streaks (last 100 candles). "
-             f"`quote` is USDC (USD and USDT accepted as aliases). {HL} {COV}")
-async def get_green_candle_streak(symbol: str = "BTC", interval: str = "4h", quote: str = "USDC") -> dict:
-    return await call("/v1/fomo/green-candles-streak", 0.003, symbol=symbol, interval=interval, quote=quote)
+@paid(0.003, "Use when the user asks how many green candles in a row a coin has. Returns the streak on 1h, "
+             "4h or 1d and how often the next candle was green after such streaks. Top 50 Hyperliquid "
+             "perpetuals by 30-day volume only (see get_supported_assets), others unpaid. Ex: symbol=BTC, "
+             "interval=1d")
+async def get_green_candle_streak(symbol: str = "BTC", interval: str = "4h") -> dict:
+    return await call("/v1/fomo/green-candles-streak", 0.003, symbol=symbol, interval=interval)
 
 
 # --- Trading context --------------------------------------------------------
 
-@paid(0.005, "Current trading session (Asia, London, New York, off-hours) and its typical volatility.")
+@paid(0.005, "Use when the user asks which trading session is active or how volatile this time of day "
+             "usually is. Returns the session (Asian, London, New York, Off-hours), overlap, minutes left, "
+             "the next session and its typical volatility multiplier, from the UTC clock. Ex: no "
+             "parameters")
 async def get_trading_session() -> dict:
     return await call("/v1/context/session", 0.005)
 
 
-@paid(0.005, "Is it a weekend or low-liquidity window right now? Returns a 0-100 liquidity score and the session.")
+@paid(0.005, "Use when the user asks whether crypto liquidity is thin right now, e.g. on a weekend or in "
+             "off-hours. Returns is_weekend, is_low_liquidity, the session, a 0-100 liquidity score and a "
+             "verdict, from the UTC clock (no market data). Ex: no parameters")
 async def get_weekend_liquidity() -> dict:
     return await call("/v1/context/weekend-liquidity", 0.005)
 
