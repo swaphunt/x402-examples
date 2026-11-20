@@ -122,6 +122,18 @@ def test_every_tool_matches_the_api_contract(api):
     assert set(seen) == set(ENDPOINTS), f"routes without a tool: {sorted(set(ENDPOINTS) - set(seen))}"
 
 
+def test_tool_descriptions_say_when_to_use_and_use_one_name_per_argument(api):
+    _, tools, _ = mcp_run({}, [])
+    for t in tools:
+        if t.name == "get_spending":
+            continue
+        body = t.description.split(" Costs $")[0].removeprefix("Free, runs locally (no API call, no payment). ")
+        assert body.startswith(("Use when the user asks", "Use when the user wants")), t.name
+        assert " Returns" in body and " Ex: " in body and len(body) <= 300, (t.name, len(body))
+        old = set(t.input_schema.get("properties", {})) & {"asset", "assets", "coin", "lookback", "quote", "currency"}
+        assert not old, (t.name, old)
+
+
 def test_tools_and_server_identify_themselves(api):
     init, tools, (spending,) = mcp_run({}, [("get_spending", {})])
     assert init.server_info.name == "swaphunt" and init.server_info.version == VERSION

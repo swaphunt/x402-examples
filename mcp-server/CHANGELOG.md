@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Changed: every tool description follows "Use when the user asks … Returns … Ex: …" (at most ~300 characters before the price), the same text as the API's `/.well-known/x402`, with tool names instead of API paths.
+- Changed: one name per argument. A coin is `symbol` (was `asset` on get_price, get_chop_detection, get_volatility, get_market_silence, get_compression_alert, get_expected_move, and `coin` on get_halving, get_coin_strength, get_correlation), several coins are `symbols` (was `assets` on get_prices), and a lookback is `period` (was `lookback` on get_market_silence). The `quote`/`currency` arguments are gone: only USDC exists.
+- Changed: `get_correlation` documents 7d and 30d only (24h is rejected by the API before payment).
+- Release only after the API with the new names is live: an older API ignores `symbol` and would price BTC.
+
 ## 0.7.0 (2026-11-12)
 
 - Added: `pm_fees`, a free tool that runs locally. It gives the exact trading fee for one order on Kalshi, Polymarket US or polymarket.com: `fee_usd`, `fee_pct_of_trade_value`, the break-even exit price for a round trip, and the rates' `as_of` (plus Kalshi's fee schedule version). It is computed by [pmfees](https://github.com/swaphunt/pmfees) 0.1.1 (new dependency, pinned) from each platform's official fee schedule. No API call and no payment, and it does not count against `MAX_SPEND_USD`. Annotations: `readOnlyHint`, not destructive, closed world.

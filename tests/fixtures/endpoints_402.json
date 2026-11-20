@@ -39,7 +39,7 @@
    "amount": "1000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "coin": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
@@ -51,15 +51,10 @@
    "amount": "5000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "currency": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     },
     "price_type": {
      "type": "string",
@@ -73,15 +68,10 @@
    "amount": "3000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "assets": {
+    "symbols": {
      "type": "string",
      "required": false,
      "default": "BTC,ETH"
-    },
-    "currency": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     },
     "price_type": {
      "type": "string",
@@ -107,7 +97,7 @@
    "amount": "3000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
@@ -116,11 +106,6 @@
      "type": "string",
      "required": false,
      "default": "4h"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -129,7 +114,7 @@
    "amount": "10000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
@@ -146,12 +131,12 @@
    "amount": "2000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
     },
-    "lookback": {
+    "period": {
      "type": "string",
      "required": false,
      "default": "7d"
@@ -163,7 +148,7 @@
    "amount": "3000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
@@ -172,11 +157,6 @@
      "type": "string",
      "required": false,
      "default": "4h"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -185,7 +165,7 @@
    "amount": "3000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "asset": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "BTC"
@@ -194,11 +174,6 @@
      "type": "string",
      "required": false,
      "default": "1d"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -259,7 +234,7 @@
    "amount": "15000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "coin": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "ETH"
@@ -268,11 +243,6 @@
      "type": "string",
      "required": false,
      "default": "24h"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -290,11 +260,6 @@
      "type": "integer",
      "required": false,
      "default": 10
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -303,7 +268,7 @@
    "amount": "3000",
    "pay_to": "0xD6b585DD2F48263D08FB75EA28c1598d845d23a8",
    "params": {
-    "coin": {
+    "symbol": {
      "type": "string",
      "required": false,
      "default": "ETH"
@@ -312,11 +277,6 @@
      "type": "string",
      "required": false,
      "default": "7d"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -329,11 +289,6 @@
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -355,11 +310,6 @@
      "type": "string",
      "required": false,
      "default": "up"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -376,11 +326,6 @@
     "level": {
      "type": "number",
      "required": true
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -393,11 +338,6 @@
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -410,11 +350,6 @@
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -427,11 +362,6 @@
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -444,11 +374,6 @@
      "type": "string",
      "required": false,
      "default": "BTC"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -466,11 +391,6 @@
      "type": "string",
      "required": false,
      "default": "4h"
-    },
-    "quote": {
-     "type": "string",
-     "required": false,
-     "default": "USDC"
     }
    }
   },
@@ -487,5 +407,5 @@
    "params": {}
   }
  ],
- "note": "Prices of the 9 test-group endpoints set to the 2026-11 price test before the API deploy; refresh with scripts/snapshot_402.py after it."
+ "note": "Prices of the 9 test-group endpoints set to the 2026-11 price test before the API deploy; refresh with scripts/snapshot_402.py after it. Params 2026-11-20 from the x402-review API branch (symbol/symbols/period, no quote/currency); price and payTo from the live snapshot."
 }
