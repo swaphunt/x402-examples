@@ -301,7 +301,11 @@ def paid(price: float, summary: str):
 
 # --- Free -------------------------------------------------------------------
 
-@mcp.tool(description="Free. Shows payment mode, USDC spent this session, calls made and budget left.")
+@mcp.tool(
+    description="Free, runs locally (no API call, no payment). Use when the user asks how much this session "
+                "has spent or what budget is left. Returns whether payments are enabled, USDC spent, paid calls, "
+                "the MAX_SPEND_USD cap and the remaining budget. Ex: no parameters",
+)
 async def get_spending() -> dict:
     return {"payments_enabled": PAY, "spent_usd": round(_spent, 6), "paid_calls": _calls,
             "cap_usd": MAX_SPEND, "remaining_usd": round(MAX_SPEND - _spent, 6)}
