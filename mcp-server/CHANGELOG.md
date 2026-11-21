@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed: `get_spending` description follows "Use when the user asks … Returns … Ex: …" like the other tools. No change to its output.
+
 ## 0.8.1 (2026-11-20)
 
 - Changed: x402 2.28.0 (was 2.26.0). No change to the tools or settings. Tested with all tests, a dry run against the live API and one real $0.001 payment (`get_supported_assets`, MAX_SPEND_USD=0.01, PAYTO_ALLOWLIST set) on 2026-11-20.
