@@ -72,7 +72,7 @@ The pattern comes from `api.lookproof.dev/mcp`: `apps/api/src/probekit_api/mcp_s
   | Per IP | IPv4, or IPv6 /64, hashed with an HMAC salt that Redis holds for one UTC day | 10 | 5 |
   | Per shared network | a named group of connector egress ranges (see Shared networks); a request from a group uses the group's one bucket instead of the IP bucket | 300 | 30 |
   | Global | one key | 2,000 | 100 |
-  - The numbers are settings (`MCP_PER_IP_DAY`, …). The ones above are starting values.
+  - The numbers are settings (`SWAPHUNT_MCP_PER_IP_DAY`, `SWAPHUNT_MCP_SHARED_DAY`, `SWAPHUNT_MCP_GLOBAL_DAY`). The ones above are starting values.
 - **Counting.**
   - A call is counted only after its arguments are valid.
   - Only a successful call (2xx) counts. Anything else, including an upstream timeout or a 422 from the route, is refunded.
@@ -110,7 +110,7 @@ The same mechanism as Lookproof (`probekit_api/mcp_anonymous.py`), with one buck
 ## Deployment and listing
 
 - **Route:** `api.swaphunt.dev/mcp` on the existing main app in swaphunt-tools. NPM host #48 with AOP is already in place, so there is no new DNS record or NPM host.
-- **Switch:** `MCP_ENABLED` (default false). Without it the route is 404.
+- **Switch:** `SWAPHUNT_MCP_ENABLED` (default false). Without it the route is 404.
 - **`server.json`:** a `remotes` entry is added (`{"type": "streamable-http", "url": "https://api.swaphunt.dev/mcp"}`) next to the PyPI package and published with the next `mcp-v*` tag.
 - **README:** a "Hosted (free trial)" section with the URL.
 - **awesome-remote-mcp-servers** requires OAuth or an API key, so it is not a target while the trial is authless.
