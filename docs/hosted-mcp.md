@@ -1,6 +1,6 @@
 # Hosted SwapHunt MCP server: spec
 
-Status: spec with estimate, not built (2026-11-20). Building starts only on the owner's go.
+Status: built 2026-11-21 on the owner's go (swaphunt-tools, `src/api/mcp/`) and deployed with `SWAPHUNT_MCP_ENABLED=false`, so `api.swaphunt.dev/mcp` is still 404. The owner turns it on after a smoke test. No `remotes` entry in `server.json` until the owner says so.
 
 Today swaphunt-mcp runs locally over stdio (`uvx swaphunt-mcp`) and pays per call with the user's own key via x402. The hosted server lets claude.ai, ChatGPT and other remote connectors add SwapHunt by URL, with no install and no wallet. It serves a small free trial only. Everything paid stays in the local package.
 
@@ -29,8 +29,8 @@ The pattern comes from `api.lookproof.dev/mcp`: `apps/api/src/probekit_api/mcp_s
 
 ### Refusals, in this order, before any work
 
-1. An `Origin` that is not on `MCP_ALLOWED_ORIGINS` (default empty) returns 403, with a JSON-RPC error without id. This is the protection against DNS rebinding. Server-side clients send no `Origin`. `/mcp` gets its own CORS list instead of `*`.
-2. The per-IP minute limiter (5 per minute, in process) returns 429. It applies to every method, so `tools/list` cannot be spammed either.
+1. An `Origin` that is not on `SWAPHUNT_MCP_ALLOWED_ORIGINS` (default empty) returns 403, with a JSON-RPC error without id. This is the protection against DNS rebinding. Server-side clients send no `Origin`. The main API's CORS list (empty in production) also covers `/mcp`, so browser clients are not supported for now.
+2. An in-process request limiter returns 429: 30 requests a minute per client, 600 per shared network. It applies to every method, so `tools/list` cannot be spammed either. The tighter per-minute limits on tool calls are in the quota below.
 3. A `PAYMENT-SIGNATURE` header returns 400: "this server never pays or takes payments; use the local package".
 4. An unsupported protocol version returns 400. Malformed JSON returns -32700, and a batch (array) returns -32600.
 5. `tools/call` arguments are checked against the tool's schema before anything runs: unknown names, wrong types, missing values, length limits. A failure returns -32602 and does not count against the quota.
@@ -70,15 +70,16 @@ The pattern comes from `api.lookproof.dev/mcp`: `apps/api/src/probekit_api/mcp_s
   | Bucket | Key | Day | Minute |
   | - | - | - | - |
   | Per IP | IPv4, or IPv6 /64, hashed with an HMAC salt that Redis holds for one UTC day | 10 | 5 |
-  | Per shared network | the connector egress ranges of claude.ai and ChatGPT (setting `MCP_SHARED_NETWORKS`, not code); a request from those ranges uses this bucket instead of the IP bucket | 300 | 30 |
+  | Per shared network | a named group of connector egress ranges (see Shared networks); a request from a group uses the group's one bucket instead of the IP bucket | 300 | 30 |
   | Global | one key | 2,000 | 100 |
   - The numbers are settings (`MCP_PER_IP_DAY`, …). The ones above are starting values.
 - **Counting.**
   - A call is counted only after its arguments are valid.
-  - It is refunded only on an internal error. An upstream timeout counts.
+  - Only a successful call (2xx) counts. Anything else, including an upstream timeout or a 422 from the route, is refunded.
+  - `pm_fees` and `get_quota` never count. The daily limit is for the four market tools.
   - INCR and EXPIRE (with `nx`) run in one MULTI/EXEC transaction, and a count that went over the limit is undone.
   - Keys expire at the end of the UTC day.
-  - Only `tools/call` counts. `initialize`, `ping` and `tools/list` count only against the minute limiter.
+  - Only `tools/call` counts. `initialize`, `ping` and `tools/list` count only against the request limiter.
 - **Fail closed.**
   - If Redis cannot be reached, `tools/call` on a market tool answers `unavailable`, and the server never runs unlimited. `pm_fees` and `get_quota` answer as normal.
   - Redis is the stack's existing one (`REDIS_URL`, `src/core/redis.py`), with a separate key prefix `mcp:trial:`.
@@ -87,6 +88,18 @@ The pattern comes from `api.lookproof.dev/mcp`: `apps/api/src/probekit_api/mcp_s
   - The shared-network and global caps use the same text, with "the free trial is busy today" instead of the first sentence.
   - The HTTP status stays 200, because the JSON-RPC result itself is the answer.
 - **At most 4 trial calls at once per replica**, so the trial can never crowd out paid x402 traffic.
+
+## Shared networks
+
+The same mechanism as Lookproof (`probekit_api/mcp_anonymous.py`), with one bucket per named group instead of per CIDR, because OpenAI publishes ~300 small prefixes.
+
+- `anthropic`: `160.79.104.0/21`, Lookproof's value for claude.ai's connector egress.
+- `openai`: only OpenAI's officially published ranges for ChatGPT connectors, https://openai.com/chatgpt-connectors.json, linked from https://developers.openai.com/api/docs/guides/ip-addresses. The file was copied verbatim on 2026-11-21 (`creationTime` 2026-11-06T18:26:55, 289 prefixes). When OpenAI changes it, download it again and deploy. If the file cannot be read, the group is empty.
+
+## Review
+
+- The free set is reviewed after the price test ends on 2026-12-09.
+- The application to the Claude directory is sent only after that review.
 
 ## Logging and privacy
 
@@ -134,5 +147,5 @@ The pattern comes from `api.lookproof.dev/mcp`: `apps/api/src/probekit_api/mcp_s
 | **Total** | **about 3 working days**, ~600-800 lines of code plus ~500 lines of tests |
 
 Risks:
-- **The claude.ai/ChatGPT egress ranges must be found and kept up to date.** Without them every connector user shares the IP bucket of a few addresses, and the trial runs out at once.
+- **The egress ranges must be kept up to date.** Anthropic's range comes from Lookproof, and OpenAI's file changes without notice. Without them every connector user shares the IP bucket of a few addresses, and the trial runs out at once.
 - **Free calls on the 4 market tools are calls the x402 route does not sell.** We measure trial use against x402 sales on the same tools after the first two weeks.
