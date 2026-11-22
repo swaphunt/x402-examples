@@ -12,6 +12,10 @@ Every tool description states its price, so the agent can see what a call costs 
 uvx swaphunt-mcp            # needs uv: https://docs.astral.sh/uv/
 ```
 
+## Hosted (free trial)
+
+No install and no wallet: add `https://api.swaphunt.dev/mcp` as a remote MCP server (Streamable HTTP) in claude.ai, ChatGPT or any client that takes a URL. It serves 6 tools for free: `pm_fees`, `get_supported_assets`, `get_halving`, `get_alt_season`, `get_market_silence` and `get_quota`, with 10 market-tool calls per IP per day (reset 00:00 UTC). It never takes payments. For all 30 tools, run the local server above.
+
 ## Tools
 
 | Tool | Price | What it returns |

@@ -1,6 +1,6 @@
 # Hosted SwapHunt MCP server: spec
 
-Status: built 2026-11-21 on the owner's go (swaphunt-tools, `src/api/mcp/`) and deployed with `SWAPHUNT_MCP_ENABLED=false`, so `api.swaphunt.dev/mcp` is still 404. The owner turns it on after a smoke test. No `remotes` entry in `server.json` until the owner says so.
+Status: live since 2026-11-21. Built on the owner's go (swaphunt-tools, `src/api/mcp/`); `SWAPHUNT_MCP_ENABLED=true` after the owner's smoke test. Checked 2026-11-22: `initialize` answers `serverInfo` "SwapHunt (free trial)" 0.1.0, `tools/list` gives the 6 tools below, and `GET` returns 405 with `Allow: POST`. `server.json` lists it under `remotes` from swaphunt-mcp 0.8.2.
 
 Today swaphunt-mcp runs locally over stdio (`uvx swaphunt-mcp`) and pays per call with the user's own key via x402. The hosted server lets claude.ai, ChatGPT and other remote connectors add SwapHunt by URL, with no install and no wallet. It serves a small free trial only. Everything paid stays in the local package.
 
@@ -110,9 +110,9 @@ The same mechanism as Lookproof (`probekit_api/mcp_anonymous.py`), with one buck
 ## Deployment and listing
 
 - **Route:** `api.swaphunt.dev/mcp` on the existing main app in swaphunt-tools. NPM host #48 with AOP is already in place, so there is no new DNS record or NPM host.
-- **Switch:** `SWAPHUNT_MCP_ENABLED` (default false). Without it the route is 404.
-- **`server.json`:** a `remotes` entry is added (`{"type": "streamable-http", "url": "https://api.swaphunt.dev/mcp"}`) next to the PyPI package and published with the next `mcp-v*` tag.
-- **README:** a "Hosted (free trial)" section with the URL.
+- **Switch:** `SWAPHUNT_MCP_ENABLED` (default false; on in production since 2026-11-21). Without it the route is 404.
+- **`server.json`:** the `remotes` entry (`{"type": "streamable-http", "url": "https://api.swaphunt.dev/mcp"}`) sits next to the PyPI package from 0.8.2 and reaches the MCP Registry with tag `mcp-v0.8.2`. No `headers`: the trial is authless.
+- **README:** the "Hosted (free trial)" section with the URL (0.8.2).
 - **awesome-remote-mcp-servers** requires OAuth or an API key, so it is not a target while the trial is authless.
 
 ## Tests

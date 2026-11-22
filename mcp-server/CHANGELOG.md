@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.2 (2026-11-22)
 
+- Added: `server.json` lists the hosted free trial as a remote (`streamable-http`, https://api.swaphunt.dev/mcp), so the MCP Registry shows the URL next to the PyPI package. The README has a "Hosted (free trial)" section.
 - Changed: `get_spending` description follows "Use when the user asks … Returns … Ex: …" like the other tools. No change to its output.
 
 ## 0.8.1 (2026-11-20)

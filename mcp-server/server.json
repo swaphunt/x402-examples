@@ -3,7 +3,7 @@
   "name": "io.github.swaphunt/swaphunt-mcp",
   "title": "SwapHunt crypto market context",
   "description": "Hyperliquid prices, regime, vol, funding, FOMO checks (x402, USDC); free Kalshi/Polymarket fees",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "websiteUrl": "https://x402.swaphunt.dev/docs",
   "repository": {
     "url": "https://github.com/swaphunt/x402-examples",
@@ -14,7 +14,9 @@
     {
       "src": "https://raw.githubusercontent.com/swaphunt/x402-examples/main/mcp-server/assets/icon-512.png",
       "mimeType": "image/png",
-      "sizes": ["512x512"]
+      "sizes": [
+        "512x512"
+      ]
     }
   ],
   "packages": [
@@ -22,7 +24,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "swaphunt-mcp",
-      "version": "0.8.1",
+      "version": "0.8.2",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -56,6 +58,12 @@
           "isRequired": false
         }
       ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.swaphunt.dev/mcp"
     }
   ]
 }
