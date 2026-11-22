@@ -124,8 +124,8 @@ The server runs with [uv](https://docs.astral.sh/uv/)'s `uvx`, which downloads i
 | Variable | Default | Effect |
 |---|---|---|
 | `X402_PAY` | off | Without `X402_PAY=1`, every tool runs as a dry run: it reports the price and returns no data. |
-| `PRIVATE_KEY_FILE` | | Path to a file with the wallet's private key (recommended). |
-| `PRIVATE_KEY` | | The key itself, if you prefer an environment variable. |
+| `PRIVATE_KEY_FILE` | | Optional, only needed to pay. Path to a file with the wallet's private key (recommended). |
+| `PRIVATE_KEY` | | Optional, only needed to pay. The key itself, if you prefer an environment variable. |
 | `MAX_SPEND_USD` | `0.10` | Spending cap for the session (one server process). Calls beyond it are refused, not paid. |
 | `PAYTO_ALLOWLIST` | any | Comma-separated addresses the server may pay. A quote to any other `payTo` is refused before anything is signed. |
 

@@ -3,7 +3,7 @@
   "name": "io.github.swaphunt/swaphunt-mcp",
   "title": "SwapHunt crypto market context",
   "description": "Hyperliquid prices, regime, vol, funding, FOMO checks (x402, USDC); free Kalshi/Polymarket fees",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "websiteUrl": "https://x402.swaphunt.dev/docs",
   "repository": {
     "url": "https://github.com/swaphunt/x402-examples",
@@ -24,7 +24,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "swaphunt-mcp",
-      "version": "0.8.2",
+      "version": "0.8.3",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -37,12 +37,12 @@
         },
         {
           "name": "PRIVATE_KEY_FILE",
-          "description": "Path to a file with the private key of a dedicated wallet holding a few dollars of USDC on Base",
+          "description": "Optional, only needed to pay (with X402_PAY=1): path to a file with the private key of a dedicated wallet holding a few dollars of USDC on Base",
           "isRequired": false
         },
         {
           "name": "PRIVATE_KEY",
-          "description": "Private key of a dedicated wallet (alternative to PRIVATE_KEY_FILE)",
+          "description": "Optional, only needed to pay (with X402_PAY=1): private key of a dedicated wallet (alternative to PRIVATE_KEY_FILE)",
           "isRequired": false,
           "isSecret": true
         },
