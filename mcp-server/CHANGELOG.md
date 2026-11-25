@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.3 (2026-11-22)
+
+- Changed: `server.json` and the README say that `PRIVATE_KEY_FILE` and `PRIVATE_KEY` are optional and only needed to pay (with `X402_PAY=1`). Both were already `isRequired: false`; without a key the server starts and every tool is a dry run. No code change.
+
 ## 0.8.2 (2026-11-22)
 
 - Added: `server.json` lists the hosted free trial as a remote (`streamable-http`, https://api.swaphunt.dev/mcp), so the MCP Registry shows the URL next to the PyPI package. The README has a "Hosted (free trial)" section.
