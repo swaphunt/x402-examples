@@ -1,5 +1,7 @@
 # SwapHunt x402 examples
 
+[![swaphunt/x402-examples MCP server](https://glama.ai/mcp/servers/swaphunt/x402-examples/badges/score.svg)](https://glama.ai/mcp/servers/swaphunt/x402-examples)
+
 [SwapHunt](https://swaphunt.dev)'s x402 API sells crypto market context per call (prices, market regime, volatility, funding, coin strength vs BTC and anti-FOMO sanity checks computed from Hyperliquid perpetuals, alt season, the Crypto Fear & Greed Index, the halving countdown, trading session and weekend liquidity), paid in USDC on Base, Polygon, Arbitrum or Solana with the [x402 protocol](https://x402.org). No account, no API key: the payment is the credential.
 
 The examples pay on Base. Every endpoint has the same price on all four networks; see [docs/endpoints.md](docs/endpoints.md) for the network list.
